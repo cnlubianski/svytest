@@ -1,0 +1,48 @@
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+home:
+  title: "svytest: Survey Weight Diagnostics"
+  description: >
+    Formal diagnostic tests for assessing the role of survey weights in regression
+    modeling, including the Hausman–Pfeffermann Difference-in-Coefficients test
+    and multiple Weight-Association tests.
+
+navbar:
+  structure:
+    left:
+      - text: "Reference"
+        href: reference/index.html
+      - text: "Articles"
+        menu:
+          - text: "Getting Started"
+            href: articles/svytest.html
+          - text: "Simulation Study"
+            href: articles/simulation-study.html
+          - text: "References"
+            href: articles/references.html
+      - text: "News"
+        href: news/index.html
+
+reference:
+  - title: "Core Tests"
+    contents:
+      - diff_in_coef
+      - wa_test
+  - title: "Helper Functions"
+    contents:
+      - tidy.diff_in_coef
+      - glance.diff_in_coef
+      - tidy.wa_test
+      - glance.wa_test
+  - title: "Datasets"
+    contents:
+      - svytestCE
+
+articles:
+  - title: "Articles"
+    contents:
+      - svytest
+      - simulation-study
+      - references

@@ -1,0 +1,11 @@
+bkfilter                Baxter-King filter of a time series
+bwfilter                Butterworth filter of a time series
+cffilter                Christiano-Fitzgerald filter of a time series
+hpfilter                Hodrick-Prescott filter of a time series
+mFilter                 Decomposition of a time series into trend and
+                        cyclical components using various filters
+mFilter-methods         Methods for mFilter objects
+mFilter-package         Getting started with the mFilter package
+trfilter                Trigonometric regression filter of a time
+                        series
+unemp                   US Quarterly Unemployment Series
