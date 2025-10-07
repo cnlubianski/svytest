@@ -22,6 +22,14 @@ samp <- generate_sample_brewer(pop, w = pop$w, n = cases$n[case])
 
 
 
+
+
+
+
+
+
+
+
 lm_object <- lm(y ~ x, data = samp, w = w)
 weights(lm_object)
 

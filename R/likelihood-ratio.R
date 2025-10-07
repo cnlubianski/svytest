@@ -43,9 +43,7 @@
 #' \code{\link{diff_in_coef}}, \code{\link{wa_test}}, \code{\link{svytestCE}}
 #'
 #' @export
-lr_test <- function(model,
-                    coef_subset = NULL,
-                    na.action = na.omit,
+lr_test <- function(model, coef_subset = NULL, na.action = na.omit,
                     likelihood = c("pseudo","scaled")) {
   if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
   likelihood <- match.arg(likelihood)
