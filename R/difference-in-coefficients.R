@@ -1,6 +1,6 @@
 #' Difference-in-Coefficients Test for Survey Weights
 #'
-#' Implements the Hausman–Pfeffermann Difference-in-Coefficients test
+#' Implements the Hausman-Pfeffermann Difference-in-Coefficients test
 #' to assess whether survey weights significantly affect regression estimates.
 #'
 #' @param model An object of class \code{svyglm}.
@@ -14,13 +14,13 @@
 #'   Defaults to all coefficients.
 #' @param na.action Function to handle missing data before fitting the test.
 #'
-#' @return An object of class \code{"diff_in_coef"} containing:
+#' @return An object of class \code{"diff_in_coef_test"} containing:
 #'   \item{statistic}{Chi-squared test statistic}
 #'   \item{parameter}{Degrees of freedom}
 #'   \item{p.value}{P-value for the test}
 #'   \item{betas_unweighted}{Unweighted coefficient estimates}
 #'   \item{betas_weighted}{Weighted coefficient estimates}
-#'   \item{vcov_diff}{Estimated variance–covariance matrix of coefficient differences}
+#'   \item{vcov_diff}{Estimated variance-covariance matrix of coefficient differences}
 #'   \item{diff_betas}{Vector of coefficient differences}
 #'   \item{call}{Function call}
 #'
@@ -32,7 +32,7 @@
 #'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
 #'   fit_svy <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE,
 #'                     design = des)
-#'   results <- diff_in_coef(fit_svy, var_equal = FALSE, robust_type = "HC3")
+#'   results <- diff_in_coef_test(fit_svy, var_equal = FALSE, robust_type = "HC3")
 #'   print(results)
 #' }
 #'
@@ -46,10 +46,10 @@
 #'
 #' @references
 #' Hausman, J. A. (1978). Specification Tests in Econometrics.
-#'   *Econometrica*, 46(6), 1251–1271. \doi{10.2307/1913827}
+#'   *Econometrica*, 46(6), 1251-1271. \doi{10.2307/1913827}
 #'
 #' Pfeffermann, D. (1993). The Role of Sampling Weights When Modeling Survey Data.
-#'   *International Statistical Review*, 61(2), 317–337. \doi{10.2307/1403631}
+#'   *International Statistical Review*, 61(2), 317-337. \doi{10.2307/1403631}
 #'
 #' @seealso
 #' \code{\link{svytestCE}} for the curated Consumer Expenditure dataset
@@ -57,16 +57,16 @@
 #'   Difference-in-Coefficients test.
 #'
 #' @export
-diff_in_coef <- function(model, lower.tail = FALSE, var_equal = TRUE,
-                         robust_type = c("HC0", "HC1", "HC2", "HC3"),
-                         coef_subset = NULL, na.action = na.omit) {
+diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
+                              robust_type = c("HC0", "HC1", "HC2", "HC3"),
+                              coef_subset = NULL, na.action = stats::na.omit) {
   if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
   robust_type <- match.arg(robust_type)
 
   # Extract design matrix, response, and weights
   wts <- weights(model$survey.design)
-  X <- model.matrix(model)
-  y <- model.response(model.frame(model))
+  X <- stats::model.matrix(model)
+  y <- stats::model.response(stats::model.frame(model))
 
   # Handle missing data
   dat <- data.frame(y = y, X, wts = wts)
@@ -94,7 +94,7 @@ diff_in_coef <- function(model, lower.tail = FALSE, var_equal = TRUE,
   W <- diag(wts, nrow = length(wts))
   betas_w <- solve(t(X) %*% W %*% X) %*% t(X) %*% W %*% y
 
-  # A matrix (p × n)
+  # A matrix (p x n)
   A <- (solve(t(X) %*% W %*% X) %*% t(X) %*% W) -
     (solve(t(X) %*% X) %*% t(X))
 
@@ -135,26 +135,26 @@ diff_in_coef <- function(model, lower.tail = FALSE, var_equal = TRUE,
   diff_betas <- betas_w - betas_u
   Chi_statistic <- as.numeric(t(diff_betas) %*% solve(V_hat) %*% diff_betas)
   df <- length(betas_u)
-  p_value <- pchisq(Chi_statistic, df = df, lower.tail = lower.tail)
+  p_value <- stats::pchisq(Chi_statistic, df = df, lower.tail = lower.tail)
 
   structure(
     list(
       statistic = Chi_statistic,
       parameter = df,
       p.value = p_value,
-      method = "Hausman–Pfeffermann Difference-in-Coefficients Test",
+      method = "Hausman-Pfeffermann Difference-in-Coefficients Test",
       betas_unweighted = as.vector(betas_u),
       betas_weighted = as.vector(betas_w),
       vcov_diff = V_hat,
       diff_betas = as.vector(diff_betas),
       call = match.call()
     ),
-    class = "diff_in_coef"
+    class = "diff_in_coef_test"
   )
 }
 
 #' @export
-print.diff_in_coef <- function(x, ...) {
+print.diff_in_coef_test <- function(x, ...) {
   cat("\n", x$method, "\n", sep = "")
   cat("Chi-squared =", formatC(x$statistic, digits = 4, format = "f"),
       " df =", x$parameter,
@@ -167,7 +167,7 @@ print.diff_in_coef <- function(x, ...) {
 }
 
 #' @export
-summary.diff_in_coef <- function(object, ...) {
+summary.diff_in_coef_test <- function(object, ...) {
   cat("\nDifference-in-Coefficients Test\n")
   cat("Call:\n")
   print(object$call)
@@ -180,7 +180,7 @@ summary.diff_in_coef <- function(object, ...) {
 }
 
 #' @export
-tidy.diff_in_coef <- function(x, ...) {
+tidy.diff_in_coef_test <- function(x, ...) {
   terms <- names(x$betas_unweighted)
   if (is.null(terms)) {
     terms <- paste0("V", seq_along(x$betas_unweighted))
@@ -194,7 +194,7 @@ tidy.diff_in_coef <- function(x, ...) {
 }
 
 #' @export
-glance.diff_in_coef <- function(x, ...) {
+glance.diff_in_coef_test <- function(x, ...) {
   tibble::tibble(
     statistic = x$statistic,
     df        = x$parameter,

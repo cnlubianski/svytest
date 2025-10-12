@@ -1,103 +1,104 @@
-#' Pfeffermann–Nathan Predictive Power Test (with optional K-fold CV)
+#' Pfeffermann-Nathan Predictive Power Test (svyglm, K-fold CV, fold-mean option) (In production)
 #'
-#' Implements the Pfeffermann–Nathan predictive power test for informativeness
-#' of survey weights in linear regression. By default, uses K-fold cross-validation
-#' to compare predictive performance of weighted vs. unweighted regressions.
+#' Reimplements the predictive power test following Wang et al. (2023, Sec. 2.2):
+#' split observations into estimation and validation sets; fit unweighted and weighted
+#' linear regressions on the estimation set; compute validation squared-error differences
+#' \eqn{D_i = (y_i - \hat y_{u,i})^2 - (y_i - \hat y_{w,i})^2}; test \eqn{H_0: E[D_i] = 0}
+#' with \eqn{Z = \bar D / (s_D / \sqrt{n_V})}. Supports K-fold CV (default) and a
+#' "fold-mean" option to reduce dependence among errors by using per-fold means as
+#' the test observations.
 #'
-#' @param data A data frame containing outcome, covariates, and weights.
-#' @param y Vector of outcome values.
-#' @param x Matrix or vector of covariates (will be coerced to matrix).
-#' @param wts Vector of survey weights.
-#' @param est_split Proportion of the sample to use for estimation (only used if \code{kfold = FALSE}).
-#' @param kfold Logical; if TRUE (default), use K-fold cross-validation instead of a single split.
-#' @param K Number of folds for cross-validation (default 5).
-#' @param seed Optional random seed for reproducibility.
+#' @param model A fitted \code{svyglm} with \code{family = gaussian(identity)}.
+#' @param kfold Logical; if TRUE, use K-fold cross-validation (default TRUE).
+#' @param K Integer number of folds (default 5).
+#' @param est_split Proportion for estimation set if \code{kfold = FALSE} (default 0.5).
+#' @param use_fold_means Logical; if TRUE (default), compute one \eqn{D} per fold
+#'   as the mean of within-fold \eqn{D_i}, then form \eqn{Z} using the \eqn{K} fold
+#'   means. This stabilizes the test by reducing dependence noted in Wang (2023).
+#' @param seed Optional integer seed for reproducibility.
 #'
-#' @return An object of class \code{"pred_power_test"} containing:
+#' @return An object of class \code{"pred_power_test"} with fields:
 #'   \item{statistic}{Z statistic}
 #'   \item{p.value}{Two-sided p-value}
-#'   \item{mean_diff}{Mean difference in squared prediction errors}
-#'   \item{n_val}{Total validation sample size across folds}
-#'   \item{K}{Number of folds (if kfold = TRUE)}
-#'   \item{call}{Matched call}
+#'   \item{mean_diff}{Mean of \eqn{D} (fold mean if \code{use_fold_means = TRUE})}
+#'   \item{n_val}{Count of observations used in Z (\eqn{K} if \code{use_fold_means = TRUE}, else total validation n)}
+#'   \item{K}{Number of folds (if \code{kfold = TRUE})}
 #'   \item{method}{Description string}
+#'   \item{call}{Matched call}
 #'
-#' @export
-pred_power_test <- function(data, y, x, wts,
-                            est_split = 0.5,
-                            kfold = TRUE,
-                            K = 5,
-                            seed = NULL) {
+#' @keywords internal
+pred_power_test <- function(model, kfold = TRUE, K = 5, est_split = 0.5,
+                            use_fold_means = TRUE, seed = NULL) {
+  if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
+  fam <- model$family
+  if (!(fam$family == "gaussian" && fam$link == "identity")) {
+    stop("pred_power_test supports only gaussian(identity) models.")
+  }
   if (!is.null(seed)) set.seed(seed)
-  n <- nrow(data)
-  if (length(y) != n || length(wts) != n) stop("y and wts must match nrow(data).")
-  X <- as.matrix(cbind(1, x))  # add intercept
 
-  all_D <- c()
+  # Extract design components
+  w <- as.numeric(weights(model$survey.design))
+  X <- stats::model.matrix(model)
+  y <- as.numeric(stats::model.response(stats::model.frame(model)))
+  n <- nrow(X)
 
-  if (kfold) {
-    # K-fold CV
-    folds <- sample(rep(1:K, length.out = n))
-    for (k in 1:K) {
-      est_index <- which(folds != k)
-      val_index <- which(folds == k)
+  # Helper to fit unweighted and weighted OLS on estimation set, predict on validation
+  predict_pair <- function(est_idx, val_idx) {
+    X_est <- X[est_idx, , drop = FALSE]
+    y_est <- y[est_idx]
+    w_est <- w[est_idx]
 
-      X_est <- X[est_index, , drop = FALSE]
-      y_est <- y[est_index]
-      w_est <- wts[est_index]
-
-      X_val <- X[val_index, , drop = FALSE]
-      y_val <- y[val_index]
-
-      # Unweighted OLS
-      beta_u <- solve(crossprod(X_est), crossprod(X_est, y_est))
-      yhat_u <- X_val %*% beta_u
-      v_u <- y_val - yhat_u
-
-      # Weighted OLS
-      W <- diag(w_est)
-      beta_w <- solve(t(X_est) %*% W %*% X_est, t(X_est) %*% W %*% y_est)
-      yhat_w <- X_val %*% beta_w
-      v_w <- y_val - yhat_w
-
-      D <- as.numeric(v_u^2 - v_w^2)
-      all_D <- c(all_D, D)
-    }
-    method <- paste0("Pfeffermann–Nathan Predictive Power Test (", K, "-fold CV)")
-  } else {
-    # Single split
-    est_n <- floor(est_split * n)
-    est_index <- sample(seq_len(n), est_n)
-    val_index <- setdiff(seq_len(n), est_index)
-
-    X_est <- X[est_index, , drop = FALSE]
-    y_est <- y[est_index]
-    w_est <- wts[est_index]
-
-    X_val <- X[val_index, , drop = FALSE]
-    y_val <- y[val_index]
+    X_val <- X[val_idx, , drop = FALSE]
+    y_val <- y[val_idx]
 
     # Unweighted OLS
     beta_u <- solve(crossprod(X_est), crossprod(X_est, y_est))
-    yhat_u <- X_val %*% beta_u
+    yhat_u <- as.numeric(X_val %*% beta_u)
     v_u <- y_val - yhat_u
 
-    # Weighted OLS
+    # Weighted OLS (WLS)
     W <- diag(w_est)
     beta_w <- solve(t(X_est) %*% W %*% X_est, t(X_est) %*% W %*% y_est)
-    yhat_w <- X_val %*% beta_w
+    yhat_w <- as.numeric(X_val %*% beta_w)
     v_w <- y_val - yhat_w
 
-    all_D <- as.numeric(v_u^2 - v_w^2)
-    method <- "Pfeffermann–Nathan Predictive Power Test (single split)"
+    D_i <- (v_u^2) - (v_w^2)
+    return(D_i)
   }
 
-  Dbar <- mean(all_D)
-  sD <- sd(all_D)
-  n_val <- length(all_D)
+  if (kfold) {
+    # K-fold CV splits
+    folds <- sample(rep(seq_len(K), length.out = n))
+    D_all <- vector("list", K)
+    for (k in seq_len(K)) {
+      est_idx <- which(folds != k)
+      val_idx <- which(folds == k)
+      D_all[[k]] <- predict_pair(est_idx, val_idx)
+    }
+    if (use_fold_means) {
+      # One D per fold (mean of within-fold D_i)
+      D_vec <- vapply(D_all, mean, numeric(1))
+      method <- paste0("Pfeffermann-Nathan Predictive Power Test (", K, "-fold CV; fold means)")
+    } else {
+      # Pool all validation D_i across folds
+      D_vec <- unlist(D_all, use.names = FALSE)
+      method <- paste0("Pfeffermann-Nathan Predictive Power Test (", K, "-fold CV)")
+    }
+  } else {
+    # Single random split
+    est_n <- floor(est_split * n)
+    est_idx <- sample(seq_len(n), est_n)
+    val_idx <- setdiff(seq_len(n), est_idx)
+    D_vec <- predict_pair(est_idx, val_idx)
+    method <- "Pfeffermann-Nathan Predictive Power Test (single split)"
+  }
 
+  # Z-test on mean difference in squared errors
+  Dbar <- mean(D_vec)
+  sD <- stats::sd(D_vec)
+  n_val <- length(D_vec)
   Z <- Dbar / (sD / sqrt(n_val))
-  pval <- 2 * (1 - pnorm(abs(Z)))
+  pval <- 2 * (1 - stats::pnorm(abs(Z)))
 
   structure(
     list(
@@ -105,8 +106,7 @@ pred_power_test <- function(data, y, x, wts,
       p.value = pval,
       mean_diff = Dbar,
       n_val = n_val,
-      est_split = if (kfold) NA else est_split,
-      K = if (kfold) K else NA,
+      K = if (kfold) K else NA_integer_,
       method = method,
       call = match.call()
     ),
@@ -126,13 +126,11 @@ print.pred_power_test <- function(x, ...) {
 
 #' @export
 summary.pred_power_test <- function(object, ...) {
-  cat("\nPfeffermann–Nathan Predictive Power Test\n")
-  cat("Call:\n")
-  print(object$call)
+  cat("\nPfeffermann-Nathan Predictive Power Test\n")
+  cat("Call:\n"); print(object$call)
   cat("\nMethod:\n ", object$method, "\n", sep = "")
   if (!is.na(object$K)) cat("K-fold cross-validation with K =", object$K, "\n")
-  if (!is.na(object$est_split)) cat("Estimation split proportion:", object$est_split, "\n")
-  cat("\nValidation sample size:", object$n_val, "\n")
+  cat("\nObservations used in Z:", object$n_val, "\n")
   cat("\nZ statistic:", formatC(object$statistic, digits = 6, format = "f"),
       " p-value:", formatC(object$p.value, digits = 6, format = "f"),
       " mean diff:", formatC(object$mean_diff, digits = 6, format = "f"), "\n")
@@ -147,7 +145,6 @@ tidy.pred_power_test <- function(x, ...) {
     p.value   = x$p.value,
     mean_diff = x$mean_diff,
     n_val     = x$n_val,
-    est_split = x$est_split,
     K         = x$K,
     method    = x$method
   )
@@ -160,7 +157,6 @@ glance.pred_power_test <- function(x, ...) {
     p.value   = x$p.value,
     mean_diff = x$mean_diff,
     n_val     = x$n_val,
-    est_split = x$est_split,
     K         = x$K,
     method    = x$method
   )

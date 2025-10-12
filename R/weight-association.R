@@ -53,18 +53,16 @@
 #' and \code{\link{svytestCE}} for the example dataset included in this package.
 #'
 #' @export
-wa_test <- function(model,
-                    type = c("DD","PS1","PS1q","PS2","PS2q","WF"),
-                    coef_subset = NULL,
-                    aux_design = NULL,
-                    na.action = na.omit) {
+wa_test <- function(model, type = c("DD", "PS1", "PS1q", "PS2", "PS2q", "WF"),
+                    coef_subset = NULL, aux_design = NULL, na.action = stats::na.omit) {
+  # Quick checks
   if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
   type <- match.arg(type)
 
   # Extract X, y, weights
-  wts <- weights(model$survey.design)
-  X <- model.matrix(model)
-  y <- model.response(model.frame(model))
+  wts <- stats::weights(model$survey.design)
+  X <- stats::model.matrix(model)
+  y <- stats::model.response(stats::model.frame(model))
 
   # Missing data
   dat <- data.frame(y = y, X, wts = wts)
@@ -144,7 +142,7 @@ wa_DD <- function(y, X, wts) {
   df2 <- length(y) - ncol(X_comb)
   F_stat <- ((RSS_reduced - RSS_full) / df1) / (RSS_full / df2)
   list(statistic = F_stat, df = c(df1, df2),
-       p.value = 1 - pf(F_stat, df1, df2),
+       p.value = 1 - stats::pf(F_stat, df1, df2),
        method = "DuMouchel–Duncan Weight-Association Test")
 }
 
@@ -172,7 +170,7 @@ wa_WF <- function(y, X, wts) {
   df2 <- length(y) - ncol(X_full)
   F_stat <- ((RSS_red - RSS_full) / df1) / (RSS_full / df2)
   list(statistic = F_stat, df = c(df1, df2),
-       p.value = 1 - pf(F_stat, df1, df2),
+       p.value = 1 - stats::pf(F_stat, df1, df2),
        method = "Wu–Fuller Weight-Association Test")
 }
 
@@ -181,7 +179,7 @@ wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
   betas_u <- solve(t(X) %*% X) %*% t(X) %*% y
   residuals <- y - X %*% betas_u
   res_diag <- diag(as.vector(residuals))
-  X_main <- X[,-1, drop = FALSE]
+  X_main <- X[, -1, drop = FALSE]
 
   # Build auxiliary terms
   if (!is.null(aux_design)) {
@@ -195,17 +193,24 @@ wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
     method <- "Pfeffermann–Sverchkov WA Test 1"
   }
 
+  # Full model
   X_design <- cbind(1, X_main, extra, residuals, residuals^2, res_diag %*% X_main)
   betas <- solve(t(X_design) %*% X_design) %*% t(X_design) %*% wts
   W_hat <- X_design %*% betas
   RSS <- sum((wts - W_hat)^2)
-  TSS <- sum((wts - mean(wts))^2)
 
-  df1 <- ncol(X_design) - (ncol(X_main) + 1 + ncol(extra))
+  # Reduced model
+  X_reduced <- cbind(1, X_main)
+  betas_reduced <- solve(t(X_reduced) %*% X_reduced) %*% t(X_reduced) %*% wts
+  W_hat_reduced <- X_reduced %*% betas_reduced
+  TSS <- sum((wts - W_hat_reduced)^2)
+
+  # Compute df, test statistic, and p-value, then return
+  df1 <- ncol(X_design) - (ncol(X_main) + 1)
   df2 <- nrow(X_design) - ncol(X_design)
   F_stat <- ((TSS - RSS) / df1) / (RSS / df2)
   list(statistic = F_stat, df = c(df1, df2),
-       p.value = 1 - pf(F_stat, df1, df2),
+       p.value = 1 - stats::pf(F_stat, df1, df2),
        method = method)
 }
 
@@ -241,7 +246,7 @@ wa_PS2 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
   df2 <- length(wts) - ncol(XY_full)
   F_stat <- ((RSS_reduced - RSS_full) / df1) / (RSS_full / df2)
   list(statistic = F_stat, df = c(df1, df2),
-       p.value = 1 - pf(F_stat, df1, df2),
+       p.value = 1 - stats::pf(F_stat, df1, df2),
        method = method)
 }
 

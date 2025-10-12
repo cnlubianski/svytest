@@ -1,6 +1,6 @@
-#' Likelihood-Ratio Test for Informative Survey Weights
+#' Likelihood-Ratio Test for Informative Survey Weights (In production)
 #'
-#' Implements the Breidt–Herndon likelihood-ratio test for assessing whether
+#' Implements the Breidt-Herndon likelihood-ratio test for assessing whether
 #' survey weights are informative in linear regression models. The test compares
 #' maximized log-likelihoods under equal weights (null) and survey weights
 #' (alternative), with an asymptotic distribution given by a weighted chi-squared
@@ -33,31 +33,31 @@
 #' @references
 #' Breidt, F. J., & Opsomer, J. D. (1997).
 #'   Testing for informativeness in analytic inference from complex surveys.
-#'   *Survey Methodology*, 23(1), 1–11.
+#'   *Survey Methodology*, 23(1), 1-11.
 #'
 #' Herndon, J. (2022).
 #'   Testing and adjusting for informative sampling in survey data.
-#'   *Journal of Survey Statistics and Methodology*, 10(3), 455–480.
+#'   *Journal of Survey Statistics and Methodology*, 10(3), 455-480.
 #'
 #' @seealso
 #' \code{\link{diff_in_coef}}, \code{\link{wa_test}}, \code{\link{svytestCE}}
 #'
-#' @export
-lr_test <- function(model, coef_subset = NULL, na.action = na.omit,
+#' @keywords internal
+lr_test <- function(model, coef_subset = NULL, na.action = stats::na.omit,
                     likelihood = c("pseudo","scaled")) {
   if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
   likelihood <- match.arg(likelihood)
 
   # Extract design matrix, response, weights
   wts <- weights(model$survey.design)
-  X <- model.matrix(model)
-  y <- model.response(model.frame(model))
+  X <- stats::model.matrix(model)
+  y <- stats::model.response(stats::model.frame(model))
 
   # Handle missing data
   dat <- data.frame(y = y, X, wts = wts)
   dat <- na.action(dat)
   y <- dat$y
-  X <- as.matrix(dat[, setdiff(names(dat), c("y","wts"))])
+  X <- as.matrix(dat[, setdiff(names(dat), c("y", "wts"))])
   wts <- dat$wts
 
   # Optionally subset coefficients
@@ -85,13 +85,13 @@ lr_test <- function(model, coef_subset = NULL, na.action = na.omit,
 
   # Null: equal weights
   wts_null <- rep(mean(wts), length(wts))
-  fit_null <- optim(init, logLike, y=y, X=X, wts=wts_null,
-                    likelihood=likelihood, method="BFGS", hessian=TRUE)
+  fit_null <- stats::optim(init, logLike, y = y, X = X, wts = wts_null,
+                           likelihood = likelihood, method = "BFGS", hessian = TRUE)
   ll_null <- -fit_null$value
 
   # Alt: actual weights
-  fit_alt <- optim(init, logLike, y=y, X=X, wts=wts,
-                   likelihood=likelihood, method="BFGS", hessian=TRUE)
+  fit_alt <- stats::optim(init, logLike, y = y, X = X, wts = wts,
+                          likelihood = likelihood, method = "BFGS", hessian = TRUE)
   ll_alt <- -fit_alt$value
 
   # LR statistic
@@ -112,13 +112,13 @@ lr_test <- function(model, coef_subset = NULL, na.action = na.omit,
     score_i <- cbind(score_beta, score_sigma)
 
     J_hat <- -fit_alt$hessian / length(y)
-    K_hat <- crossprod(scale(score_i, scale=FALSE)) / length(y)
+    K_hat <- crossprod(scale(score_i, scale = FALSE)) / length(y)
     Gamma <- solve(J_hat) %*% K_hat %*% solve(J_hat)
-    eigvals <- eigen(Gamma, only.values=TRUE)$values
+    eigvals <- eigen(Gamma, only.values = TRUE)$values
 
     df <- 2 * (sum(eigvals)^2) / sum(eigvals^2)
     scale <- sum(eigvals) / df
-    pval <- 1 - pchisq(LR/scale, df=df)
+    pval <- 1 - stats::pchisq(LR/scale, df=df)
   }
 
   structure(
@@ -129,7 +129,7 @@ lr_test <- function(model, coef_subset = NULL, na.action = na.omit,
       eigvals   = eigvals,
       logLik_null = ll_null,
       logLik_alt  = ll_alt,
-      method    = paste("Breidt–Herndon Likelihood-Ratio Test (", likelihood, " likelihood)", sep=""),
+      method    = paste("Breidt-Herndon Likelihood-Ratio Test (", likelihood, " likelihood)", sep=""),
       call      = match.call()
     ),
     class = "lr_test"
@@ -139,9 +139,9 @@ lr_test <- function(model, coef_subset = NULL, na.action = na.omit,
 #' @export
 print.lr_test <- function(x, ...) {
   cat("\n", x$method, "\n", sep = "")
-  cat("LR =", formatC(x$statistic, digits=4, format="f"),
-      if (!is.na(x$df)) paste(" df ≈", formatC(x$df, digits=2, format="f")) else "",
-      " p-value =", formatC(x$p.value, digits=4, format="f"), "\n")
+  cat("LR =", formatC(x$statistic, digits = 4, format = "f"),
+      if (!is.na(x$df)) paste(" df =", formatC(x$df, digits = 2, format = "f")) else "",
+      " p-value =", formatC(x$p.value, digits = 4, format = "f"), "\n")
   invisible(x)
 }
 

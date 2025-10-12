@@ -1,17 +1,21 @@
 Package: svytest
 Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1.0
+Title: Survey Weight Diagnostic Tests
+Version: 1.1.0
 Authors@R: c(
     person(
       "Corbin", "Lubianski",
       email = "cnlubianski@yahoo.com",
-      role = c("aut", "cre")
+      role = c("aut", "cre"),
+      comment = c(ORCID = "0009-0009-0547-3249")
     )
   )
-Description: More about what it does (maybe more than one line).
-    Continuation lines should be indented.
-License: What license is it under?
+Description: Provides diagnostic tests for assessing informativeness of survey 
+    weights in regression models. Implements weighted-adjusted tests, 
+    difference-in-coefficients, estimating-equation approaches, and 
+    permutation-based methods. Helps analysts decide whether to incorporate 
+    survey weights in analytic inference, particularly linear regressions.
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Depends: 

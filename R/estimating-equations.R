@@ -1,6 +1,6 @@
 #' Estimating Equations Test for Informative Sampling (Linear Case)
 #'
-#' Implements the Pfeffermann–Sverchkov estimating equations test for
+#' Implements the Pfeffermann-Sverchkov estimating equations test for
 #' informativeness of survey weights in the linear regression case
 #' (Gaussian with identity link). The test compares unweighted estimating
 #' equations to adjusted-weight equations using \eqn{q_i = w_i / E_s(w_i \mid x_i)}.
@@ -48,8 +48,6 @@
 #' res <- estim_eq_test(fit, q_method = "linear")
 #' print(res)
 #' summary(res)
-#' tidy(res)
-#' glance(res)
 #' }
 #'
 #' @references
@@ -61,7 +59,7 @@
 #'
 #' @export
 estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log"),
-                          stabilize = TRUE, na.action = na.omit) {
+                          stabilize = TRUE, na.action = stats::na.omit) {
   if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
   fam <- model$family
   if (!(fam$family == "gaussian" && fam$link == "identity")) {
@@ -71,8 +69,8 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
 
   # Extract data
   w <- weights(model$survey.design)
-  X_full <- model.matrix(model)
-  y <- model.response(model.frame(model))
+  X_full <- stats::model.matrix(model)
+  y <- stats::model.response(stats::model.frame(model))
 
   # Handle missing
   dat <- data.frame(y = y, X_full, w = w)
@@ -103,28 +101,28 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
   W_df <- data.frame(w = w, X)
   if (q_method == "linear") {
     fit_w <- lm(w ~ ., data = W_df)
-    w_hat <- as.numeric(predict(fit_w, newdata = W_df))
+    w_hat <- as.numeric(stats::predict(fit_w, newdata = W_df))
     w_hat <- pmax(w_hat, .Machine$double.eps)
   } else {
-    fit_w <- lm(log(w) ~ ., data = W_df)
-    w_hat <- exp(as.numeric(predict(fit_w, newdata = W_df)))
+    fit_w <- stats::lm(log(w) ~ ., data = W_df)
+    w_hat <- exp(as.numeric(stats::predict(fit_w, newdata = W_df)))
   }
 
   q <- w / w_hat
   if (stabilize) {
-    lo <- quantile(q, probs = 1e-3, na.rm = TRUE)
-    hi <- quantile(q, probs = 1 - 1e-3, na.rm = TRUE)
+    lo <- stats::quantile(q, probs = 1e-3, na.rm = TRUE)
+    hi <- stats::quantile(q, probs = 1 - 1e-3, na.rm = TRUE)
     q <- pmax(pmin(q, hi), lo)
   }
 
   # R_i = (1 - q_i) u_i
   R <- sweep(U, 1, (1 - q), `*`)
   Rbar <- colMeans(R)
-  S <- cov(R)
+  S <- stats::cov(R)
 
   # Hotelling F
   Fstat <- as.numeric(((n - p) / p) * (t(Rbar) %*% solve(S, Rbar)))
-  pval <- pf(Fstat, df1 = p, df2 = n - p, lower.tail = FALSE)
+  pval <- stats::pf(Fstat, df1 = p, df2 = n - p, lower.tail = FALSE)
 
   structure(
     list(
@@ -136,7 +134,7 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
       S = S,
       terms = terms,
       n = n,
-      method = "Pfeffermann–Sverchkov Estimating Equations Test (linear case)",
+      method = "Pfeffermann-Sverchkov Estimating Equations Test (linear case)",
       call = match.call()
     ),
     class = "estim_eq_test"

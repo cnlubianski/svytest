@@ -5,12 +5,24 @@
 #' WLS (linear case) via C++ and a pure R engine (with optional future.apply parallelization).
 #'
 #' @param model An object of class \code{svyglm} (currently supports Gaussian family best).
-#' @param stat Statistic to use: \code{"pred_mean"}, \code{"coef_dist"},
-#'   \code{"coef_mahal"}, \code{"LR"}.
+#' @param stat Statistic to use. Options:
+#'   \itemize{
+#'     \item \code{"pred_mean"}:
+#'       Compares the mean predicted outcome under weighted vs. unweighted regression.
+#'       Simple, interpretable, and directly tied to differences in fitted population means.
+#'       Sensitive to shifts in overall prediction levels caused by informative weights.
+#'
+#'     \item \code{"coef_mahal"}:
+#'       Computes the Mahalanobis distance between the weighted and unweighted coefficient vectors,
+#'       using the unweighted precision matrix (\eqn{X'X}) as the metric. Captures joint shifts in regression coefficients,
+#'       not just mean predictions. More powerful when informativeness manifests as changes in slopes
+#'       or multiple coefficients simultaneously.
+#'   }
+#'
 #' @param B Number of permutations (e.g., 1000).
 #' @param coef_subset Optional character vector of coefficient names to include.
 #' @param block Optional factor for blockwise permutations (e.g., strata), permute within levels.
-#' @param likelihood Likelihood form for LR: \code{"pseudo"} (default) or \code{"scaled"}.
+#' @param normalize Logical; if TRUE (default), normalize weights to have mean 1.
 #' @param engine \code{"C++"} for fast WLS or \code{"R"} for pure R loop.
 #' @param custom_fun Optional function(model, X, y, wts) -> scalar statistic (overrides \code{stat}).
 #' @param parallel Logical; if TRUE and engine is "R", uses future.apply for parallel permutations.
@@ -28,25 +40,19 @@
 #'   \item{method}{Description string}
 #'
 #' @export
-perm_test <- function(model,
-                      stat = c("pred_mean", "coef_dist", "coef_mahal", "LR"),
-                      B = 1000,
-                      coef_subset = NULL,
-                      block = NULL,
-                      likelihood = c("pseudo", "scaled"),
-                      engine = c("C++", "R"),
-                      custom_fun = NULL,
-                      parallel = FALSE,
-                      na.action = na.omit) {
+perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
+                      coef_subset = NULL, block = NULL, normalize = TRUE,
+                      engine = c("C++", "R"), custom_fun = NULL, parallel = FALSE,
+                      na.action = stats::na.omit) {
+  # Quick checks
   if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
   stat <- match.arg(stat)
-  likelihood <- match.arg(likelihood)
   engine <- match.arg(engine)
 
   # Extract design matrix, response, weights
   wts <- weights(model$survey.design)
-  X <- model.matrix(model)
-  y <- model.response(model.frame(model))
+  X <- stats::model.matrix(model)
+  y <- stats::model.response(stats::model.frame(model))
 
   # Handle missing data in a unified frame
   dat <- data.frame(y = y, X, wts = wts)
@@ -54,6 +60,7 @@ perm_test <- function(model,
   y <- dat$y
   X <- as.matrix(dat[, setdiff(names(dat), c("y", "wts"))])
   wts <- dat$wts
+  n <- length(y)
 
   # Optional subset of coefficients (columns of X)
   if (!is.null(coef_subset)) {
@@ -62,11 +69,9 @@ perm_test <- function(model,
     X <- X[, keep_cols, drop = FALSE]
   }
 
-  n <- length(y)
-
   # Equal-weight baseline and chosen weights
   w_null <- rep(mean(wts), n)
-  w_use <- if (likelihood == "scaled") (wts / mean(wts)) else wts
+  w_use <- if (normalize) (wts / mean(wts)) else wts
 
   # Fast WLS helper in R
   wls_fit <- function(X, y, w) {
@@ -82,46 +87,24 @@ perm_test <- function(model,
   }
 
   # Statistic calculators
-  pred_mean_stat <- function(beta) {
-    mean(as.numeric(X %*% beta))
-  }
-  coef_dist_stat <- function(beta, beta0) {
-    sum((beta - beta0)^2)
-  }
+  pred_mean_stat <- function(beta) mean(as.numeric(X %*% beta))
   coef_mahal_stat <- function(beta, beta0, XtX) {
     # Mahalanobis distance with respect to unweighted precision X'X:
-    # delta^T (X'X) delta
-    d <- beta - beta0
+    d <- beta - beta0 # delta^T (X'X) delta
     as.numeric(t(d) %*% XtX %*% d)
-  }
-  lr_stat <- function(beta, mu, sigma2, w, beta0, mu0, sigma20) {
-    # Gaussian pseudo-likelihood LR = 2 (ll_alt - ll_null)
-    # ll(w) = -0.5 * sum(w * [log(2*pi*sigma2) + resid^2/sigma2])
-    resid <- y - mu
-    ll_alt <- -0.5 * sum(w * (log(2 * pi * sigma2) + (resid^2) / sigma2))
-    resid0 <- y - mu0
-    ll_null <- -0.5 * sum(w_null * (log(2 * pi * sigma20) + (resid0^2) / sigma20))
-    2 * (ll_alt - ll_null)
   }
 
   # Baseline fits
-  fit_null <- wls_fit(X, y, if (likelihood == "scaled") (w_null / mean(w_null)) else w_null)
+  fit_null <- wls_fit(X, y, if (normalize) (w_null / mean(w_null)) else w_null)
   fit_alt  <- wls_fit(X, y, w_use)
 
   stat_obs <- switch(stat,
                      "pred_mean" = pred_mean_stat(fit_alt$beta),
-                     "coef_dist" = coef_dist_stat(fit_alt$beta, fit_null$beta),
-                     "coef_mahal" = coef_mahal_stat(fit_alt$beta, fit_null$beta, fit_null$XtX),
-                     "LR"        = lr_stat(fit_alt$beta, fit_alt$mu, fit_alt$sigma2,
-                                           w_use, fit_null$beta, fit_null$mu, fit_null$sigma2)
+                     "coef_mahal" = coef_mahal_stat(fit_alt$beta, fit_null$beta, fit_null$XtX)
   )
   stat_null <- switch(stat,
                       "pred_mean" = pred_mean_stat(fit_null$beta),
-                      "coef_dist" = 0, # baseline difference is 0
-                      "coef_mahal" = 0, # baseline difference is 0
-                      "LR"        = lr_stat(fit_null$beta, fit_null$mu, fit_null$sigma2,
-                                            if (likelihood == "scaled") (w_null / mean(w_null)) else w_null,
-                                            fit_null$beta, fit_null$mu, fit_null$sigma2)
+                      "coef_mahal" = 0 # baseline difference is 0
   )
 
   # Generate permutations (within blocks if provided)
@@ -156,7 +139,7 @@ perm_test <- function(model,
       X      = X,
       y      = y,
       w      = w_use,
-      w_null = if (likelihood == "scaled") (w_null / mean(w_null)) else w_null,
+      w_null = if (normalize) (w_null / mean(w_null)) else w_null,
       perm   = perm_matrix,
       stat   = stat
     )
@@ -168,10 +151,7 @@ perm_test <- function(model,
       fit_b <- wls_fit(X, y, w_b)
       switch(stat,
              "pred_mean"  = pred_mean_stat(fit_b$beta),
-             "coef_dist"  = coef_dist_stat(fit_b$beta, fit_null$beta),
-             "coef_mahal" = coef_mahal_stat(fit_b$beta, fit_null$beta, fit_null$XtX),
-             "LR"         = lr_stat(fit_b$beta, fit_b$mu, fit_b$sigma2,
-                                    w_b, fit_null$beta, fit_null$mu, fit_null$sigma2)
+             "coef_mahal" = coef_mahal_stat(fit_b$beta, fit_null$beta, fit_null$XtX)
       )
     }
 
@@ -259,4 +239,33 @@ glance.perm_test <- function(x, ...) {
     B         = x$B,
     method    = x$method
   )
+}
+
+#' Plot method for permutation test objects
+#'
+#' Produces a histogram of the permutation distribution with a vertical line
+#' indicating the observed statistic.
+#'
+#' @param x An object of class \code{"perm_test"}.
+#' @param bins Number of histogram bins (default 30).
+#' @param col Color for histogram bars (default "lightgray").
+#' @param line_col Color for observed statistic line (default "red").
+#' @param ... Additional arguments passed to \code{hist()}.
+#'
+#' @export
+plot.perm_test <- function(x, bins = 30, col = "lightgray", line_col = "red", ...) {
+  if (is.null(x$perm_stats) || is.null(x$statistic)) {
+    stop("Object must contain 'perm_stats' and 'statistic'.")
+  }
+
+  graphics::hist(x$perm_stats,
+                 breaks = bins,
+                 col = col,
+                 main = "Permutation Test Null Distribution",
+                 xlab = "Test statistic",
+                 ...)
+  graphics::abline(v = x$statistic, col = line_col, lwd = 2)
+  graphics::legend("topright",
+                   legend = c("Observed statistic"),
+                   col = line_col, lwd = 2, bty = "n")
 }

@@ -1,0 +1,28 @@
+---
+title: "Survey Weight Diagnostics with svytest"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Survey Weight Diagnostics with svytest}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Introduction
+
+The **svytest** package provides formal diagnostic tests for assessing the role
+of survey weights in regression modeling. Two complementary approaches are
+implemented:
+
+- **Difference-in-Coefficients test** (`diff_in_coef_test()`):  
+  A Hausman–Pfeffermann style test comparing weighted and unweighted regression
+  coefficients.
+
+- **Weight-Association tests** (`wa_test()`):  
+  A family of tests (DuMouchel–Duncan, Pfeffermann–Sverchkov, Wu–Fuller) that
+  examine whether the survey weights are systematically associated with the
+  response after conditioning on covariates.
+
+Together, these tools help researchers evaluate whether survey weights are
+ignorable or whether they materially affect inference.
+
+

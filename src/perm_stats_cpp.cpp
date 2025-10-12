@@ -26,22 +26,11 @@ inline double stat_value(const std::string& stat,
   if (stat == "pred_mean") {
     vec pred = X * beta;
     return mean(pred);
-  } else if (stat == "coef_dist") {
-    vec diff = beta - beta0;
-    return dot(diff, diff);
   } else if (stat == "coef_mahal") {
     // Mahalanobis distance with respect to unweighted precision X'X: delta' (X'X) delta
     vec diff = beta - beta0;
     vec tmp  = XtX * diff;
     return dot(diff, tmp);
-  } else if (stat == "LR") {
-    // ll_alt
-    vec resid = y - mu;
-    double ll_alt = -0.5 * sum(w % (log(2.0 * M_PI * sigma2) + (square(resid) / sigma2)));
-    // ll_null (fixed baseline under equal weights)
-    vec resid0 = y - mu0;
-    double ll_null = -0.5 * sum(w_null % (log(2.0 * M_PI * sigma20) + (square(resid0) / sigma20)));
-    return 2.0 * (ll_alt - ll_null);
   } else {
     return NA_REAL;
   }

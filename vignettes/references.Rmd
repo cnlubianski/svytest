@@ -1,0 +1,24 @@
+---
+title: "References for svytest"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{References for svytest}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Core References
+
+- Hausman, J. A. (1978). *Specification Tests in Econometrics*. Econometrica, 46(6), 1251–1271.
+- Pfeffermann, D. (1993). *The Role of Sampling Weights When Modeling Survey Data*. International Statistical Review, 61(2), 317–337.
+
+# Weight-Association Tests
+
+- DuMouchel, W. H., & Duncan, G. J. (1983). *Using Sample Survey Weights in Multiple Regression Analyses of Stratified Samples*. JASA, 78(383), 535–543.
+- Pfeffermann, D., & Sverchkov, M. (1999). *Parametric and Semi-parametric Estimation of Regression Models Fitted to Survey Data*. Sankhyā, 61(1), 166–186.
+- Pfeffermann, D., & Sverchkov, M. (2003). *Fitting Generalized Linear Models under Informative Sampling*. In Chambers & Skinner (Eds.), *Analysis of Survey Data*. Wiley.
+- Wu, Y., & Fuller, W. A. (2005). *Preliminary Testing Procedures for Regression with Survey Samples*. JSM Proceedings, Survey Research Methods Section, 3683–3688.
+
+# Additional Reading
+
+(Add all other PDFs you’ve uploaded here in consistent format.)
