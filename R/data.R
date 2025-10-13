@@ -20,13 +20,13 @@
 #'   \item{BATHRMQ}{Number of bathrooms in the consumer unit.}
 #'   \item{BEDROOMQ}{Number of bedrooms in the consumer unit.}
 #'   \item{VEHQ}{Number of owned vehicles.}
-#'   \item{FAM_TYPE}{Household type based on the relationship of members to the reference person; for example, 1 = Married Couple only, 2 = Married Couple with children (oldest < 6 years), 3 = Married Couple with children (oldest 6–17 years), etc.}
+#'   \item{FAM_TYPE}{Household type based on the relationship of members to the reference person; for example, 1 = Married Couple only, 2 = Married Couple with children (oldest < 6 years), 3 = Married Couple with children (oldest 6-17 years), etc.}
 #'   \item{FAM_SIZE}{Number of members in the consumer unit (family size).}
 #'   \item{PERSLT18}{Count of persons less than 18 years old in the consumer unit.}
 #'   \item{PERSOT64}{Count of persons older than 64 years in the consumer unit.}
 #'   \item{NO_EARNR}{Number of earners in the consumer unit.}
 #'   \item{AGE}{Age of the primary earner.}
-#'   \item{EDUCA}{Education level of the primary earner, coded as 1 = None, 2 = 1st–8th Grade, 3 = Some high school, 4 = High school, 5 = Some college, 6 = AA degree, 7 = Bachelor's degree, 8 = Advanced degree.}
+#'   \item{EDUCA}{Education level of the primary earner, coded as 1 = None, 2 = 1st-8th Grade, 3 = Some high school, 4 = High school, 5 = Some college, 6 = AA degree, 7 = Bachelor's degree, 8 = Advanced degree.}
 #'   \item{SEX}{Gender of the primary earner (F = Female, M = Male).}
 #'   \item{MARITAL}{Marital status of the primary earner (1 = Married, 2 = Widowed, 3 = Divorced, 4 = Separated, 5 = Never Married).}
 #'   \item{MEMBRACE}{Race of the primary earner (e.g., 1 = White, 2 = Black, 3 = Native American, 4 = Asian, 5 = Pacific Islander, 6 = Multi-race).}

@@ -63,6 +63,10 @@ run_all_diagnostic_tests <- function(model, alpha = 0.05) {
   )
 }
 
+#' @rdname run_all_diagnostic_tests
+#' @method print run_all_diagnostic_tests
+#' @param x An object of class run_all_diagnostic_tests
+#' @param ... Additional arguments passed to methods
 #' @export
 print.run_all_diagnostic_tests <- function(x, ...) {
   cat("\nDiagnostic Tests for Informative Weights\n")

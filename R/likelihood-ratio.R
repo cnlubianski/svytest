@@ -40,7 +40,7 @@
 #'   *Journal of Survey Statistics and Methodology*, 10(3), 455-480.
 #'
 #' @seealso
-#' \code{\link{diff_in_coef}}, \code{\link{wa_test}}, \code{\link{svytestCE}}
+#' \code{\link{diff_in_coef_test}}, \code{\link{wa_test}}, \code{\link{svytestCE}}
 #'
 #' @keywords internal
 lr_test <- function(model, coef_subset = NULL, na.action = stats::na.omit,
@@ -49,7 +49,7 @@ lr_test <- function(model, coef_subset = NULL, na.action = stats::na.omit,
   likelihood <- match.arg(likelihood)
 
   # Extract design matrix, response, weights
-  wts <- weights(model$survey.design)
+  wts <- stats::weights(model$survey.design)
   X <- stats::model.matrix(model)
   y <- stats::model.response(stats::model.frame(model))
 
@@ -81,7 +81,7 @@ lr_test <- function(model, coef_subset = NULL, na.action = stats::na.omit,
     return(-ll) # optim minimizes
   }
 
-  init <- c(rep(0, ncol(X)), log(var(y)))
+  init <- c(rep(0, ncol(X)), log(stats::var(y)))
 
   # Null: equal weights
   wts_null <- rep(mean(wts), length(wts))
@@ -136,7 +136,11 @@ lr_test <- function(model, coef_subset = NULL, na.action = stats::na.omit,
   )
 }
 
-#' @export
+#' @rdname lr_test
+#' @method print lr_test
+#' @param x An object of class lr_test
+#' @param ... Additional arguments passed to methods
+#' @keywords internal
 print.lr_test <- function(x, ...) {
   cat("\n", x$method, "\n", sep = "")
   cat("LR =", formatC(x$statistic, digits = 4, format = "f"),
@@ -145,7 +149,11 @@ print.lr_test <- function(x, ...) {
   invisible(x)
 }
 
-#' @export
+#' @rdname lr_test
+#' @method summary lr_test
+#' @param object An object of class lr_test
+#' @param ... Additional arguments passed to methods
+#' @keywords internal
 summary.lr_test <- function(object, ...) {
   cat("\nLikelihood-Ratio Test for Informative Weights\n")
   cat("Call:\n")
@@ -163,7 +171,11 @@ summary.lr_test <- function(object, ...) {
   invisible(object)
 }
 
-#' @export
+#' @rdname lr_test
+#' @method tidy lr_test
+#' @param x An object of class lr_test
+#' @param ... Additional arguments passed to methods
+#' @keywords internal
 tidy.lr_test <- function(x, ...) {
   tibble::tibble(
     term     = "likelihood_ratio",
@@ -174,7 +186,11 @@ tidy.lr_test <- function(x, ...) {
   )
 }
 
-#' @export
+#' @rdname lr_test
+#' @method glance lr_test
+#' @param x An object of class lr_test
+#' @param ... Additional arguments passed to methods
+#' @keywords internal
 glance.lr_test <- function(x, ...) {
   tibble::tibble(
     statistic = x$statistic,

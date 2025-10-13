@@ -64,7 +64,7 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
   robust_type <- match.arg(robust_type)
 
   # Extract design matrix, response, and weights
-  wts <- weights(model$survey.design)
+  wts <- stats::weights(model$survey.design)
   X <- stats::model.matrix(model)
   y <- stats::model.response(stats::model.frame(model))
 
@@ -153,6 +153,10 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
   )
 }
 
+#' @rdname diff_in_coef_test
+#' @method print diff_in_coef_test
+#' @param x An object of class diff_in_coef_test
+#' @param ... Additional arguments passed to methods
 #' @export
 print.diff_in_coef_test <- function(x, ...) {
   cat("\n", x$method, "\n", sep = "")
@@ -166,6 +170,10 @@ print.diff_in_coef_test <- function(x, ...) {
   invisible(x)
 }
 
+#' @rdname diff_in_coef_test
+#' @method summary diff_in_coef_test
+#' @param object An object of class diff_in_coef_test
+#' @param ... Additional arguments passed to methods
 #' @export
 summary.diff_in_coef_test <- function(object, ...) {
   cat("\nDifference-in-Coefficients Test\n")
@@ -179,7 +187,10 @@ summary.diff_in_coef_test <- function(object, ...) {
   invisible(object)
 }
 
-#' @export
+#' @rdname diff_in_coef_test
+#' @method tidy diff_in_coef_test
+#' @param x An object of class diff_in_coef_test
+#' @param ... Additional arguments passed to methods
 tidy.diff_in_coef_test <- function(x, ...) {
   terms <- names(x$betas_unweighted)
   if (is.null(terms)) {
@@ -193,7 +204,10 @@ tidy.diff_in_coef_test <- function(x, ...) {
   )
 }
 
-#' @export
+#' @rdname diff_in_coef_test
+#' @method glance diff_in_coef_test
+#' @param x An object of class diff_in_coef_test
+#' @param ... Additional arguments passed to methods
 glance.diff_in_coef_test <- function(x, ...) {
   tibble::tibble(
     statistic = x$statistic,

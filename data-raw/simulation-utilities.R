@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------
-
-
-
+# Title: Simulation Utility Functions
+# General functions to be sourced in by the simulation scripts. These include
+# functions to generate the population data and for sampling from the population.
 # ------------------------------------------------------------------------------
 
 # Function to generate data from Wang et al.'s (2023) Study 1
@@ -22,3 +22,4 @@ generate_sample_brewer <- function(data, w, n) {
     mutate(w = 1 / pik[1:nrow(data) * choosen])
   samp
 }
+

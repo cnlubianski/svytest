@@ -2,6 +2,6 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 perm_stats_cpp <- function(X, y, w, w_null, perm, stat) {
-    .Call(`_svytest_perm_stats_cpp`, X, y, w, w_null, perm, stat)
+    .Call('_svytest_perm_stats_cpp', PACKAGE = 'svytest', X, y, w, w_null, perm, stat)
 }
 

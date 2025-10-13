@@ -37,7 +37,7 @@ pred_power_test <- function(model, kfold = TRUE, K = 5, est_split = 0.5,
   if (!is.null(seed)) set.seed(seed)
 
   # Extract design components
-  w <- as.numeric(weights(model$survey.design))
+  w <- as.numeric(stats::weights(model$survey.design))
   X <- stats::model.matrix(model)
   y <- as.numeric(stats::model.response(stats::model.frame(model)))
   n <- nrow(X)
@@ -114,7 +114,11 @@ pred_power_test <- function(model, kfold = TRUE, K = 5, est_split = 0.5,
   )
 }
 
-#' @export
+#' @rdname pred_power_test
+#' @method print pred_power_test
+#' @param x An object of class pred_power_test
+#' @param ... Additional arguments passed to methods
+#' @keywords internal
 print.pred_power_test <- function(x, ...) {
   cat("\n", x$method, "\n", sep = "")
   cat("Z =", formatC(x$statistic, digits = 4, format = "f"),
@@ -124,7 +128,11 @@ print.pred_power_test <- function(x, ...) {
   invisible(x)
 }
 
-#' @export
+#' @rdname pred_power_test
+#' @method summary pred_power_test
+#' @param object An object of class pred_power_test
+#' @param ... Additional arguments passed to methods
+#' @keywords internal
 summary.pred_power_test <- function(object, ...) {
   cat("\nPfeffermann-Nathan Predictive Power Test\n")
   cat("Call:\n"); print(object$call)
@@ -137,7 +145,11 @@ summary.pred_power_test <- function(object, ...) {
   invisible(object)
 }
 
-#' @export
+#' @rdname pred_power_test
+#' @method tidy pred_power_test
+#' @param x An object of class pred_power_test
+#' @param ... Additional arguments passed to methods
+#' @keywords internal
 tidy.pred_power_test <- function(x, ...) {
   tibble::tibble(
     term      = "predictive_power",
@@ -150,7 +162,11 @@ tidy.pred_power_test <- function(x, ...) {
   )
 }
 
-#' @export
+#' @rdname pred_power_test
+#' @method glance pred_power_test
+#' @param x An object of class pred_power_test
+#' @param ... Additional arguments passed to methods
+#' @keywords internal
 glance.pred_power_test <- function(x, ...) {
   tibble::tibble(
     statistic = x$statistic,

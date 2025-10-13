@@ -7,7 +7,7 @@
 #'
 #' @section Functions:
 #' \itemize{
-#'   \item \code{\link{diff_in_coef}}: Hausman-Pfeffermann Difference-in-Coefficients test.
+#'   \item \code{\link{diff_in_coef_test}}: Hausman-Pfeffermann Difference-in-Coefficients test.
 #'   \item (future functions will be listed here as you add them).
 #' }
 #'
@@ -36,4 +36,5 @@
 #'
 #' @docType package
 #' @name svytest
-NULL
+#' @keywords internal
+"_PACKAGE"

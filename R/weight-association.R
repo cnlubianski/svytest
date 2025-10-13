@@ -2,9 +2,9 @@
 #'
 #' Implements several weight-association tests that examine whether survey
 #' weights are informative about the response variable after conditioning
-#' on covariates. Variants include DuMouchel–Duncan (DD), Pfeffermann–Sverchkov
+#' on covariates. Variants include DuMouchel-Duncan (DD), Pfeffermann-Sverchkov
 #' (PS1 and PS2, with optional quadratic terms or user-supplied auxiliary designs),
-#' and Wu–Fuller (WF).
+#' and Wu-Fuller (WF).
 #'
 #' @param model An object of class \code{svyglm}.
 #' @param type Character string specifying the test type:
@@ -32,24 +32,24 @@
 #' @references
 #' DuMouchel, W. H., & Duncan, G. J. (1983).
 #'   Using sample survey weights in multiple regression analyses of stratified samples.
-#'   *Journal of the American Statistical Association*, 78(383), 535–543.
+#'   *Journal of the American Statistical Association*, 78(383), 535-543.
 #'
 #' Pfeffermann, D., & Sverchkov, M. (1999).
 #'   Parametric and semi-parametric estimation of regression models fitted to survey data.
-#'   *Sankhyā: The Indian Journal of Statistics, Series B*, 61(1), 166–186.
+#'   *Sankhya: The Indian Journal of Statistics, Series B*, 61(1), 166-186.
 #'
 #' Pfeffermann, D., & Sverchkov, M. (2003).
 #'   Fitting generalized linear models under informative sampling.
 #'   In R. L. Chambers & C. J. Skinner (Eds.), *Analysis of Survey Data*
-#'   (pp. 175–196). Wiley.
+#'   (pp. 175-196). Wiley.
 #'
 #' Wu, Y., & Fuller, W. A. (2005).
 #'   Preliminary testing procedures for regression with survey samples.
 #'   In *Proceedings of the Joint Statistical Meetings, Survey Research Methods Section*
-#'   (pp. 3683–3688). American Statistical Association.
+#'   (pp. 3683-3688). American Statistical Association.
 #'
 #' @seealso
-#' \code{\link{diff_in_coef}} for the Hausman–Pfeffermann difference-in-coefficients test,
+#' \code{\link{diff_in_coef_test}} for the Hausman-Pfeffermann difference-in-coefficients test,
 #' and \code{\link{svytestCE}} for the example dataset included in this package.
 #'
 #' @export
@@ -100,6 +100,10 @@ wa_test <- function(model, type = c("DD", "PS1", "PS1q", "PS2", "PS2q", "WF"),
   )
 }
 
+#' @rdname wa_test
+#' @method print wa_test
+#' @param x An object of class wa_test
+#' @param ... Additional arguments passed to methods
 #' @export
 print.wa_test <- function(x, ...) {
   cat("\n", x$method, "\n", sep = "")
@@ -111,6 +115,10 @@ print.wa_test <- function(x, ...) {
 }
 
 
+#' @rdname wa_test
+#' @method summary wa_test
+#' @param object An object of class wa_test
+#' @param ... Additional arguments passed to methods
 #' @export
 summary.wa_test <- function(object, ...) {
   cat("\nWeight-Association Test\n")
@@ -125,7 +133,8 @@ summary.wa_test <- function(object, ...) {
 }
 
 
-# DuMouchel–Duncan WA test
+#' DuMouchel-Duncan WA test
+#' @keywords internal
 wa_DD <- function(y, X, wts) {
   W <- diag(wts, nrow = length(wts))
   X_tilde <- W %*% X
@@ -143,10 +152,11 @@ wa_DD <- function(y, X, wts) {
   F_stat <- ((RSS_reduced - RSS_full) / df1) / (RSS_full / df2)
   list(statistic = F_stat, df = c(df1, df2),
        p.value = 1 - stats::pf(F_stat, df1, df2),
-       method = "DuMouchel–Duncan Weight-Association Test")
+       method = "DuMouchel-Duncan Weight-Association Test")
 }
 
-# Wu–Fuller test
+#' Wu-Fuller test
+#' @keywords internal
 wa_WF <- function(y, X, wts) {
   X_main <- X[,-1, drop = FALSE]
 
@@ -171,10 +181,11 @@ wa_WF <- function(y, X, wts) {
   F_stat <- ((RSS_red - RSS_full) / df1) / (RSS_full / df2)
   list(statistic = F_stat, df = c(df1, df2),
        p.value = 1 - stats::pf(F_stat, df1, df2),
-       method = "Wu–Fuller Weight-Association Test")
+       method = "Wu-Fuller Weight-Association Test")
 }
 
-# Pfeffermann–Sverchkov Test 1
+#' Pfeffermann-Sverchkov Test 1
+#' @keywords internal
 wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
   betas_u <- solve(t(X) %*% X) %*% t(X) %*% y
   residuals <- y - X %*% betas_u
@@ -184,13 +195,13 @@ wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
   # Build auxiliary terms
   if (!is.null(aux_design)) {
     extra <- if (is.function(aux_design)) aux_design(X_main, y) else aux_design
-    method <- "Pfeffermann–Sverchkov WA Test 1 (Custom Aux)"
+    method <- "Pfeffermann-Sverchkov WA Test 1 (Custom Aux)"
   } else if (quadratic) {
     extra <- cbind(X_main^2)
-    method <- "Pfeffermann–Sverchkov WA Test 1 (Quadratic)"
+    method <- "Pfeffermann-Sverchkov WA Test 1 (Quadratic)"
   } else {
     extra <- NULL
-    method <- "Pfeffermann–Sverchkov WA Test 1"
+    method <- "Pfeffermann-Sverchkov WA Test 1"
   }
 
   # Full model
@@ -214,7 +225,8 @@ wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
        method = method)
 }
 
-# Pfeffermann–Sverchkov Test 2
+#' Pfeffermann-Sverchkov Test 2
+#' @keywords internal
 wa_PS2 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
   X_main <- X[,-1, drop = FALSE]
 
@@ -222,17 +234,17 @@ wa_PS2 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
     extra <- if (is.function(aux_design)) aux_design(X_main, y) else aux_design
     XY_full    <- cbind(1, X_main, extra, y, y^2)
     XY_reduced <- cbind(1, X_main, extra)
-    method <- "Pfeffermann–Sverchkov WA Test 2 (Custom Aux)"
+    method <- "Pfeffermann-Sverchkov WA Test 2 (Custom Aux)"
     added_cols <- 2
   } else if (quadratic) {
     XY_full    <- cbind(1, X_main, X_main^2, y, y^2)
     XY_reduced <- cbind(1, X_main, X_main^2)
-    method <- "Pfeffermann–Sverchkov WA Test 2 (Quadratic)"
+    method <- "Pfeffermann-Sverchkov WA Test 2 (Quadratic)"
     added_cols <- 2
   } else {
     XY_full    <- cbind(1, X_main, y, y^2)
     XY_reduced <- cbind(1, X_main)
-    method <- "Pfeffermann–Sverchkov WA Test 2"
+    method <- "Pfeffermann-Sverchkov WA Test 2"
     added_cols <- 2
   }
 
@@ -250,8 +262,10 @@ wa_PS2 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
        method = method)
 }
 
-
-#' @export
+#' @rdname wa_test
+#' @method tidy wa_test
+#' @param x An object of class wa_test
+#' @param ... Additional arguments passed to methods
 tidy.wa_test <- function(x, ...) {
   tibble::tibble(
     term     = "weights_association",
@@ -263,7 +277,10 @@ tidy.wa_test <- function(x, ...) {
   )
 }
 
-#' @export
+#' @rdname wa_test
+#' @method glance wa_test
+#' @param x An object of class wa_test
+#' @param ... Additional arguments passed to methods
 glance.wa_test <- function(x, ...) {
   tibble::tibble(
     statistic = x$statistic,

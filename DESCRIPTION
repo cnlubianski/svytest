@@ -19,11 +19,20 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Depends: 
-    R (>= 3.5)
+    R (>= 4.1.0)
 Imports:
   Rcpp
 LinkingTo: 
   Rcpp,
   RcppArmadillo
-Suggests: knitr, rmarkdown, quarto
+Suggests: 
+  knitr,
+  rmarkdown,
+  quarto,
+  dplyr,
+  tibble,
+  future.apply,
+  survey,
+  broom
 VignetteBuilder: knitr
+RoxygenNote: 7.3.3

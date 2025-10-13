@@ -55,7 +55,8 @@
 #' Fitting generalized linear models under informative sampling.
 #' In R. L. Chambers & C. J. Skinner (Eds.), *Analysis of Survey Data* (Ch. 12). Wiley.
 #'
-#' @seealso \code{\link{diff_in_coef}}, \code{\link{lr_test}}, \code{\link{wa_test}}, \code{\link{perm_test}}
+#' @seealso \code{\link{diff_in_coef_test}}, \code{\link{lr_test}},
+#'    \code{\link{wa_test}}, \code{\link{perm_test}}
 #'
 #' @export
 estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log"),
@@ -68,7 +69,7 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
   q_method <- match.arg(q_method)
 
   # Extract data
-  w <- weights(model$survey.design)
+  w <- stats::weights(model$survey.design)
   X_full <- stats::model.matrix(model)
   y <- stats::model.response(stats::model.frame(model))
 
@@ -100,7 +101,7 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
   # Estimate E_s(w|x)
   W_df <- data.frame(w = w, X)
   if (q_method == "linear") {
-    fit_w <- lm(w ~ ., data = W_df)
+    fit_w <- stats::lm(w ~ ., data = W_df)
     w_hat <- as.numeric(stats::predict(fit_w, newdata = W_df))
     w_hat <- pmax(w_hat, .Machine$double.eps)
   } else {
@@ -141,6 +142,10 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
   )
 }
 
+#' @rdname estim_eq_test
+#' @method print estim_eq_test
+#' @param x An object of class estim_eq_test
+#' @param ... Additional arguments passed to methods
 #' @export
 print.estim_eq_test <- function(x, ...) {
   cat("\n", x$method, "\n", sep = "")
@@ -150,6 +155,10 @@ print.estim_eq_test <- function(x, ...) {
   invisible(x)
 }
 
+#' @rdname estim_eq_test
+#' @method summary estim_eq_test
+#' @param object An object of class estim_eq_test
+#' @param ... Additional arguments passed to methods
 #' @export
 summary.estim_eq_test <- function(object, ...) {
   cat("\nEstimating Equations Test (linear case)\n")
@@ -164,7 +173,10 @@ summary.estim_eq_test <- function(object, ...) {
   invisible(object)
 }
 
-#' @export
+#' @rdname estim_eq_test
+#' @method tidy estim_eq_test
+#' @param x An object of class estim_eq_test
+#' @param ... Additional arguments passed to methods
 tidy.estim_eq_test <- function(x, ...) {
   tibble::tibble(
     term      = x$terms,
@@ -178,7 +190,10 @@ tidy.estim_eq_test <- function(x, ...) {
   )
 }
 
-#' @export
+#' @rdname estim_eq_test
+#' @method glance estim_eq_test
+#' @param x An object of class estim_eq_test
+#' @param ... Additional arguments passed to methods
 glance.estim_eq_test <- function(x, ...) {
   tibble::tibble(
     statistic = x$statistic,

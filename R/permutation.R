@@ -39,6 +39,8 @@
 #'   \item{call}{Matched call}
 #'   \item{method}{Description string}
 #'
+#' @importFrom Rcpp evalCpp
+#'
 #' @export
 perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
                       coef_subset = NULL, block = NULL, normalize = TRUE,
@@ -50,7 +52,7 @@ perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
   engine <- match.arg(engine)
 
   # Extract design matrix, response, weights
-  wts <- weights(model$survey.design)
+  wts <- stats::weights(model$survey.design)
   X <- stats::model.matrix(model)
   y <- stats::model.response(stats::model.frame(model))
 
@@ -187,6 +189,10 @@ perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
   out
 }
 
+#' @rdname perm_test
+#' @method print perm_test
+#' @param x An object of class perm_test
+#' @param ... Additional arguments passed to methods
 #' @export
 print.perm_test <- function(x, ...) {
   cat("\n", x$method, "\n", sep = "")
@@ -197,6 +203,10 @@ print.perm_test <- function(x, ...) {
   invisible(x)
 }
 
+#' @rdname perm_test
+#' @method summary perm_test
+#' @param object An object of class perm_test
+#' @param ... Additional arguments passed to methods
 #' @export
 summary.perm_test <- function(object, ...) {
   cat("\nPermutation test for weight informativeness\n")
@@ -215,7 +225,10 @@ summary.perm_test <- function(object, ...) {
   invisible(object)
 }
 
-#' @export
+#' @rdname perm_test
+#' @method tidy perm_test
+#' @param x An object of class perm_test
+#' @param ... Additional arguments passed to methods
 tidy.perm_test <- function(x, ...) {
   tibble::tibble(
     term      = paste0("perm_", x$stat),
@@ -228,7 +241,10 @@ tidy.perm_test <- function(x, ...) {
   )
 }
 
-#' @export
+#' @rdname perm_test
+#' @method glance perm_test
+#' @param x An object of class perm_test
+#' @param ... Additional arguments passed to methods
 glance.perm_test <- function(x, ...) {
   tibble::tibble(
     stat      = x$stat,
