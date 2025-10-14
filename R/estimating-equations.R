@@ -55,8 +55,7 @@
 #' Fitting generalized linear models under informative sampling.
 #' In R. L. Chambers & C. J. Skinner (Eds.), *Analysis of Survey Data* (Ch. 12). Wiley.
 #'
-#' @seealso \code{\link{diff_in_coef_test}}, \code{\link{lr_test}},
-#'    \code{\link{wa_test}}, \code{\link{perm_test}}
+#' @seealso \code{\link{diff_in_coef_test}}, \code{\link{wa_test}}, \code{\link{perm_test}}
 #'
 #' @export
 estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log"),
@@ -90,13 +89,10 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
     terms <- colnames(X)
   }
 
-  n <- nrow(X)
-  p <- ncol(X)
-
   # Unweighted OLS
   beta_hat <- solve(crossprod(X), crossprod(X, y))
   resid <- y - X %*% beta_hat
-  U <- sweep(X, 1, resid, `*`)  # scores
+  U <- sweep(X, 1, resid, `*`) # scores
 
   # Estimate E_s(w|x)
   W_df <- data.frame(w = w, X)
@@ -122,6 +118,7 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
   S <- stats::cov(R)
 
   # Hotelling F
+  n <- nrow(X); p <- ncol(X)
   Fstat <- as.numeric(((n - p) / p) * (t(Rbar) %*% solve(S, Rbar)))
   pval <- stats::pf(Fstat, df1 = p, df2 = n - p, lower.tail = FALSE)
 

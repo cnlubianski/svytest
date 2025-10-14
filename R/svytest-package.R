@@ -2,39 +2,95 @@
 #'
 #' The **svytest** package provides diagnostic tools for assessing the role of
 #' survey weights in regression modeling. It implements formal tests such as
-#' the Hausman-Pfeffermann Difference-in-Coefficients test, along with helper
-#' datasets and utilities for reproducible survey analysis.
+#' the Hausman-Pfeffermann Difference-in-Coefficients test, permutation-based
+#' diagnostics, and Wald-type assessments of weight informativeness. The package
+#' also includes curated datasets and reproducible workflows for applied survey
+#' analysis.
 #'
 #' @section Functions:
 #' \itemize{
 #'   \item \code{\link{diff_in_coef_test}}: Hausman-Pfeffermann Difference-in-Coefficients test.
-#'   \item (future functions will be listed here as you add them).
+#'   \item \code{\link{wa_test}}: Wald-type test for weight informativeness.
+#'   \item \code{\link{perm_test}}: Permutation-based diagnostic for weight effects.
+#'   \item \code{\link{estim_eq_test}}: Pfeffermann-Sverchkov estimating equations test.
+#'   \item \code{\link{run_all_diagnostic_tests}}: Wrapper to run all tests and summarize results.
 #' }
 #'
 #' @section Datasets:
 #' \itemize{
-#'   \item \code{\link{svytestCE}}: Curated subset of the Consumer Expenditure dataset,
+#'   \item \code{\link{svytestCE}}: Curated subset of the Consumer Expenditure Survey,
 #'         useful for demonstrating survey-weighted regression diagnostics.
 #' }
 #'
 #' @details
 #' The package builds on the general Hausman specification test
 #' (Hausman, 1978) and its adaptation to survey weights by Pfeffermann (1993).
-#' These methods allow researchers to formally test whether survey weights
-#' materially affect regression estimates.
+#' It also incorporates subsequent developments in testing for informative
+#' weights, weight trimming, and model diagnostics in complex survey settings
+#' (e.g., DuMouchel & Duncan, 1983; Wu & Fuller, 2005; Asparouhov & Muthen, 2007;
+#' Breidt et al., 2013; Wang et al., 2023). These methods allow researchers to
+#' formally assess whether survey weights materially affect regression estimates,
+#' and to evaluate the robustness of analytic inferences under complex sampling.
 #'
 #' @references
-#' Hausman, J. A. (1978). Specification Tests in Econometrics.
+#' Asparouhov, T. & B. Muthen (2007). Testing for informative weights and weight trimming
+#'   in multivariate modeling with survey data. *Mplus Web Notes*, 2, 3394-3399.
+#'   \url{https://api.semanticscholar.org/CorpusID:4506846}
+#'
+#' Bollen, K. A., Biemer, P. P., Karr, A. F., Tueller, S., & Berzofsky, M. E. (2016).
+#'   Are Survey Weights Needed? A Review of Diagnostic Tests in Regression Analysis.
+#'   *Annual Review of Statistics and Its Applications*, 3, 375-392.
+#'   \doi{10.1146/annurev-statistics-011516-012958}
+#'
+#' Breidt, F. J., Opsomer, J. D., Herndon, W., Cao, R., & Francisco-Fern, M. (2013).
+#'   Testing for informativeness in analytic inference from complex surveys.
+#'   *Proceedings of the 59th ISI World Statistics Congress*, 889-893.
+#'
+#' DuMouchel, W. H., & Duncan, G. J. (1983).
+#'   Using Sample Survey Weights in Multiple Regression Analyses of Stratified Samples.
+#'   *Journal of the American Statistical Association*, 78, 535-543.
+#'
+#' Hausman, J. A. (1978).
+#'   Specification Tests in Econometrics.
 #'   *Econometrica*, 46(6), 1251-1271. \doi{10.2307/1913827}
 #'
-#' Pfeffermann, D. (1993). The Role of Sampling Weights When Modeling Survey Data.
+#' Pfeffermann, D. (1993).
+#'   The Role of Sampling Weights When Modeling Survey Data.
 #'   *International Statistical Review*, 61(2), 317-337. \doi{10.2307/1403631}
 #'
+#' Pfeffermann, D. & Nathan, G. (1985).
+#'   Problems in model identification based on data from complex sample surveys.
+#'   *Bulletin of the International Statistical Institute*, 51(12.2), 1-12.
+#'
+#' Pfeffermann, D. & Sverchkov, M. (1999).
+#'   Parametric and Semi-Parametric Estimation of Regression Models Fitted to Survey Data.
+#'   *Indian Statistical Institute*, 61(1), 166-186.
+#'
+#' Pfeffermann, D. & Sverchkov, M. (2003).
+#'   Fitting generalized linear models under informative sampling.
+#'   In: *Analysis of Survey Data*. Chichester, UK: John Wiley & Sons, Ltd., pp. 175-195.
+#'
+#' Pfeffermann, D. & Sverchkov, M. (2007).
+#'   Small area estimation under informative probability sampling of areas and within the selected areas.
+#'   *Journal of the American Statistical Association*, 102(480), 1427-1439.
+#'
+#' Toth, D. (2021).
+#'   rpms: Recursive Partitioning for Modeling Survey Data. R package version 0.5.1.
+#'   \url{https://CRAN.R-project.org/package=rpms}
+#'
+#' Wang, F., Wang, H., & Yan, J. (2023).
+#'   Diagnostic Tests for the Necessity of Weight in Regression With Survey Data.
+#'   *International Statistical Review*, 91(1), 55-71.
+#'
+#' Wu, Y., & Fuller, W. A. (2005).
+#'   Preliminary testing procedures for regression with survey samples.
+#'   *Proceedings of the Joint Statistical Meetings, Survey Research Methods Section*, 3683-3688.
+#'
 #' @seealso
-#' \code{\link{diff_in_coef_test}}, \code{\link{svytestCE}},
-#' \code{\link{wa_test}}, \code{\link{perm_test}}
+#' \code{\link{diff_in_coef_test}}, \code{\link{wa_test}}, \code{\link{perm_test}}, \code{\link{svytestCE}}
 #'
 #' @docType package
 #' @name svytest
 #' @keywords internal
 "_PACKAGE"
+

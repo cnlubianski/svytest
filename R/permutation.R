@@ -18,7 +18,6 @@
 #'       not just mean predictions. More powerful when informativeness manifests as changes in slopes
 #'       or multiple coefficients simultaneously.
 #'   }
-#'
 #' @param B Number of permutations (e.g., 1000).
 #' @param coef_subset Optional character vector of coefficient names to include.
 #' @param block Optional factor for blockwise permutations (e.g., strata), permute within levels.

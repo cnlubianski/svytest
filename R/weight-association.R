@@ -24,10 +24,29 @@
 #'   \item{call}{Function call}
 #'
 #' @details
-#' Weight-association tests provide a diagnostic for whether survey weights
-#' are informative about the response variable after conditioning on covariates.
-#' They extend the general idea of specification testing to the survey-weighted
-#' regression context, with different formulations proposed in the literature.
+#' The following weight-association test variants are available:
+#'
+#' \itemize{
+#'   \item \strong{DuMouchel-Duncan (DD)}: Tests informativeness by regressing
+#'         residuals on the survey weights. One of the earliest approaches to
+#'         diagnosing weight effects in regression.
+#'         (DuMouchel & Duncan, 1983).
+#'
+#'   \item \strong{Pfeffermann-Sverchkov PS1}: Augments the regression with
+#'         functions of the weights as auxiliary regressors to test for
+#'         informativeness. Quadratic terms can be included (\code{"PS1q"}).
+#'         (Pfeffermann & Sverchkov, 1999).
+#'
+#'   \item \strong{Pfeffermann-Sverchkov PS2}: Uses a two-step approach with
+#'         fitted values from an auxiliary regression of weights on covariates
+#'         to construct test regressors. Quadratic terms can be included
+#'         (\code{"PS2q"}). (Pfeffermann & Sverchkov, 2003).
+#'
+#'   \item \strong{Wu-Fuller (WF)}: A preliminary test procedure that evaluates
+#'         whether weighted and unweighted regression estimates differ
+#'         significantly, providing a practical diagnostic for weight necessity.
+#'         (Wu & Fuller, 2005).
+#' }
 #'
 #' @references
 #' DuMouchel, W. H., & Duncan, G. J. (1983).
@@ -68,7 +87,7 @@ wa_test <- function(model, type = c("DD", "PS1", "PS1q", "PS2", "PS2q", "WF"),
   dat <- data.frame(y = y, X, wts = wts)
   dat <- na.action(dat)
   y <- dat$y
-  X <- as.matrix(dat[, setdiff(names(dat), c("y","wts"))])
+  X <- as.matrix(dat[, setdiff(names(dat), c("y", "wts"))])
   wts <- dat$wts
 
   # Optionally subset coefficients
@@ -158,7 +177,7 @@ wa_DD <- function(y, X, wts) {
 #' Wu-Fuller test
 #' @keywords internal
 wa_WF <- function(y, X, wts) {
-  X_main <- X[,-1, drop = FALSE]
+  X_main <- X[, -1, drop = FALSE]
 
   # Auxiliary: regress weights on 1, X, X^2 -> construct q = w / w_hat
   X_aux <- cbind(1, X_main, X_main^2)
@@ -228,7 +247,7 @@ wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
 #' Pfeffermann-Sverchkov Test 2
 #' @keywords internal
 wa_PS2 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
-  X_main <- X[,-1, drop = FALSE]
+  X_main <- X[, -1, drop = FALSE]
 
   if (!is.null(aux_design)) {
     extra <- if (is.function(aux_design)) aux_design(X_main, y) else aux_design

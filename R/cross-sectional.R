@@ -39,8 +39,8 @@ run_all_diagnostic_tests <- function(model, alpha = 0.05) {
     tibble::tibble(
       test = nm,
       statistic = if (!is.null(obj$statistic)) unname(obj$statistic) else NA_real_,
-      p.value   = if (!is.null(obj$p.value))   obj$p.value else NA_real_,
-      reject    = if (!is.null(obj$p.value))   obj$p.value <= alpha else NA
+      p.value   = if (!is.null(obj$p.value)) obj$p.value else NA_real_,
+      reject    = if (!is.null(obj$p.value)) obj$p.value <= alpha else NA
     )
   }) |> dplyr::bind_rows()
 
