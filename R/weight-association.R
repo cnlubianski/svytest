@@ -48,6 +48,21 @@
 #'         (Wu & Fuller, 2005).
 #' }
 #'
+#' @examples
+#' if (requireNamespace("survey", quietly = TRUE)) {
+#'   # Load in survey package (required) and load in example data
+#'   library(survey)
+#'   data("svytestCE", package = "svytest")
+#'
+#'   # Create a survey design and fit a weighted regression model
+#'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+#'   fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+#'
+#'   # Run weight-association diagnostic test; reports F-stat, df's, and p-value
+#'   results <- wa_test(fit, type = "DD")
+#'   print(results)
+#' }
+#'
 #' @references
 #' DuMouchel, W. H., & Duncan, G. J. (1983).
 #'   Using sample survey weights in multiple regression analyses of stratified samples.
@@ -225,13 +240,13 @@ wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
 
   # Full model
   X_design <- cbind(1, X_main, extra, residuals, residuals^2, res_diag %*% X_main)
-  betas <- solve(t(X_design) %*% X_design) %*% t(X_design) %*% wts
+  betas <- qr.solve(X_design, wts) # More robust to collinearity than solve()
   W_hat <- X_design %*% betas
   RSS <- sum((wts - W_hat)^2)
 
   # Reduced model
   X_reduced <- cbind(1, X_main)
-  betas_reduced <- solve(t(X_reduced) %*% X_reduced) %*% t(X_reduced) %*% wts
+  betas_reduced <- qr.solve(X_reduced, wts) # More robust to collinearity than solve()
   W_hat_reduced <- X_reduced %*% betas_reduced
   TSS <- sum((wts - W_hat_reduced)^2)
 
@@ -267,10 +282,10 @@ wa_PS2 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
     added_cols <- 2
   }
 
-  betas_full <- solve(t(XY_full) %*% XY_full) %*% t(XY_full) %*% wts
+  betas_full <- qr.solve(XY_full, wts)
   RSS_full <- sum((wts - XY_full %*% betas_full)^2)
 
-  betas_reduced <- solve(t(XY_reduced) %*% XY_reduced) %*% t(XY_reduced) %*% wts
+  betas_reduced <- qr.solve(XY_reduced, wts)
   RSS_reduced <- sum((wts - XY_reduced %*% betas_reduced)^2)
 
   df1 <- added_cols

@@ -14,11 +14,26 @@
 #'   \item{recommendation}{Character string with suggested action}
 #'   \item{raw}{List of raw test outputs, including permutation test objects}
 #'
+#' @examples
+#' if (requireNamespace("survey", quietly = TRUE)) {
+#'   # Load in survey package (required) and load in example data
+#'   library(survey)
+#'   data("svytestCE", package = "svytest")
+#'
+#'   # Create a survey design and fit a weighted regression model
+#'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+#'   fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+#'
+#'   # Run all diagnostic tests and return a list of statistics, including a recommendation
+#'   results <- run_all_diagnostic_tests(fit)
+#'   print(results)
+#' }
+#'
 #' @seealso \code{\link{wa_test}}, \code{\link{diff_in_coef_test}},
 #'   \code{\link{estim_eq_test}}, \code{\link{perm_test}}
 #'
 #' @export
-run_all_diagnostic_tests <- function(model, alpha = 0.05) {
+run_all_diagnostic_tests <- function(model, alpha = 0.05, B = 1000) {
   # Run all tests
   tests <- list(
     DD   = wa_test(model, type = "DD"),
@@ -29,8 +44,8 @@ run_all_diagnostic_tests <- function(model, alpha = 0.05) {
     WF   = wa_test(model, type = "WF"),
     HP   = diff_in_coef_test(model, var_equal = TRUE),
     PS3  = estim_eq_test(model),
-    perm_mean  = perm_test(model, stat = "pred_mean",  B = 1000, engine = "R"),
-    perm_mahal = perm_test(model, stat = "coef_mahal", B = 1000, engine = "R")
+    perm_mean  = perm_test(model, stat = "pred_mean",  B = B, engine = "R"),
+    perm_mahal = perm_test(model, stat = "coef_mahal", B = B, engine = "R")
   )
 
   # Extract comparable results into a tidy data frame

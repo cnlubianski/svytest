@@ -25,15 +25,19 @@
 #'   \item{call}{Function call}
 #'
 #' @examples
-#' if (requireNamespace("survey", quietly = TRUE) &&
-#'     exists("svytestCE", where = "package:svytest")) {
+#' if (requireNamespace("survey", quietly = TRUE)) {
+#'   # Load in survey package (required) and load in example data
 #'   library(survey)
 #'   data("svytestCE", package = "svytest")
+#'
+#'   # Create a survey design and fit a weighted regression model
 #'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
-#'   fit_svy <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE,
-#'                     design = des)
-#'   results <- diff_in_coef_test(fit_svy, var_equal = FALSE, robust_type = "HC3")
-#'   print(results)
+#'   fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+#'
+#'   # Run difference-in-coefficients diagnostic test versions with different variance assumptions
+#'   # and reports Chi-Squared statistic, df, and p-value
+#'   summary(diff_in_coef_test(fit, var_equal = TRUE))
+#'   summary(diff_in_coef_test(fit, var_equal = FALSE, robust_type = "HC3"))
 #' }
 #'
 #' @details
@@ -143,8 +147,8 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
       parameter = df,
       p.value = p_value,
       method = "Hausman-Pfeffermann Difference-in-Coefficients Test",
-      betas_unweighted = as.vector(betas_u),
-      betas_weighted = as.vector(betas_w),
+      betas_unweighted = setNames(as.vector(betas_u), names(coef(model))),
+      betas_weighted = setNames(as.vector(betas_w), names(coef(model))),
       vcov_diff = V_hat,
       diff_betas = as.vector(diff_betas),
       call = match.call()

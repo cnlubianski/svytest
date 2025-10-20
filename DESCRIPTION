@@ -26,13 +26,15 @@ LinkingTo:
   Rcpp,
   RcppArmadillo
 Suggests: 
-  knitr,
-  rmarkdown,
-  quarto,
-  dplyr,
-  tibble,
-  future.apply,
-  survey,
-  broom
+    knitr,
+    rmarkdown,
+    quarto,
+    dplyr,
+    tibble,
+    future.apply,
+    survey,
+    broom,
+    testthat (>= 3.0.0)
 VignetteBuilder: knitr
 RoxygenNote: 7.3.3
+Config/testthat/edition: 3

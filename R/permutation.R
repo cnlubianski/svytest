@@ -38,6 +38,21 @@
 #'   \item{call}{Matched call}
 #'   \item{method}{Description string}
 #'
+#' @examples
+#' if (requireNamespace("survey", quietly = TRUE)) {
+#'   # Load in survey package (required) and load in example data
+#'   library(survey)
+#'   data("svytestCE", package = "svytest")
+#'
+#'   # Create a survey design and fit a weighted regression model
+#'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+#'   fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+#'
+#'   # Run permutation diagnostic test; reports permutation statistics with p-value
+#'   results <- perm_test(fit, stat = "pred_mean", B = 1000, engine = "R")
+#'   print(results)
+#' }
+#'
 #' @importFrom Rcpp evalCpp
 #'
 #' @export
