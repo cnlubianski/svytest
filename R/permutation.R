@@ -2,7 +2,7 @@
 #'
 #' Non-parametric test that permutes survey weights (optionally within blocks)
 #' to generate the null distribution of a chosen statistic. Supports fast closed-form
-#' WLS (linear case) via C++ and a pure R engine (with optional future.apply parallelization).
+#' WLS (linear case) via C++ and a pure R engine.
 #'
 #' @param model An object of class \code{svyglm} (currently supports Gaussian family best).
 #' @param stat Statistic to use. Options:
@@ -24,7 +24,6 @@
 #' @param normalize Logical; if TRUE (default), normalize weights to have mean 1.
 #' @param engine \code{"C++"} for fast WLS or \code{"R"} for pure R loop.
 #' @param custom_fun Optional function(model, X, y, wts) -> scalar statistic (overrides \code{stat}).
-#' @param parallel Logical; if TRUE and engine is "R", uses future.apply for parallel permutations.
 #' @param na.action Function to handle missing data.
 #'
 #' @return An object of class \code{"perm_test"} with fields:
@@ -53,81 +52,103 @@
 #'   print(results)
 #' }
 #'
+#' @useDynLib svytest, .registration = TRUE
 #' @importFrom Rcpp evalCpp
 #'
 #' @export
 perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
                       coef_subset = NULL, block = NULL, normalize = TRUE,
-                      engine = c("C++", "R"), custom_fun = NULL, parallel = FALSE,
+                      engine = c("C++", "R"), custom_fun = NULL,
                       na.action = stats::na.omit) {
-  # Quick checks
+
+  # Argument checks
   if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
-  stat <- match.arg(stat)
-  engine <- match.arg(engine)
+  valid_stats <- c("pred_mean", "coef_mahal")
+  stat <- tolower(if (length(stat) == 1L) stat else stat[1L])
+  if (!is.character(stat) || !stat %in% valid_stats) {
+    stop("Invalid `stat`: must be one of ", paste(valid_stats, collapse = ", "), ".")
+  }
+  valid_engines <- c("c++", "r")
+  engine <- tolower(if (length(engine) == 1L) engine else engine[1L])
+  if (!is.character(engine) || !engine %in% valid_engines) {
+    stop("Invalid `engine`: must be one of 'C++', 'R'.")
+  }
+  if (length(B) != 1L || !is.numeric(B) || is.na(B) || B < 1 || B != as.integer(B)) {
+    stop("`B` must be a positive integer (number of permutations).")
+  }
+  B <- as.integer(B)
+  if (!is.null(coef_subset) && !is.character(coef_subset)) {
+    stop("`coef_subset` must be a character vector of coefficient names.")
+  }
+  if (!is.null(block) && !(is.factor(block) || is.character(block) || is.numeric(block))) {
+    stop("`block` must be NULL or a vector coercible to factor (e.g., strata labels).")
+  }
+  if (!is.logical(normalize) || length(normalize) != 1L || is.na(normalize)) {
+    stop("`normalize` must be a single logical value (TRUE/FALSE).")
+  }
+  if (!is.null(custom_fun) && !is.function(custom_fun)) {
+    stop("`custom_fun` must be NULL or a function (model, X, y, wts) -> numeric scalar.")
+  }
+  if (!is.function(na.action)) {
+    stop("`na.action` must be a function (e.g., stats::na.omit).")
+  }
+  fam_name <- tryCatch(family(model)$family, error = function(e) NA_character_)
+  if (!is.na(fam_name) && !grepl("gaussian", fam_name, ignore.case = TRUE)) {
+    warning("Non-Gaussian family detected; permutation WLS is calibrated for Gaussian models.")
+  }
 
-  # Extract design matrix, response, weights
-  wts <- stats::weights(model$survey.design)
-  X <- stats::model.matrix(model)
-  y <- stats::model.response(stats::model.frame(model))
+  # Data extraction
+  wts <- tryCatch(stats::weights(model$survey.design),
+                  error = function(e) stop("Could not extract weights from `model$survey.design`."))
+  X <- tryCatch(stats::model.matrix(model),
+                error = function(e) stop("Could not extract model matrix from `model`."))
+  y <- tryCatch(stats::model.response(stats::model.frame(model)),
+                error = function(e) stop("Could not extract response from `model`."))
+  if (length(y) != nrow(X) || length(y) != length(wts)) {
+    stop("Mismatch in dimensions of response, design matrix, and weights.")
+  }
 
-  # Handle missing data in a unified frame
+  # Missing data handling
   dat <- data.frame(y = y, X, wts = wts)
   dat <- na.action(dat)
-  y <- dat$y
-  X <- as.matrix(dat[, setdiff(names(dat), c("y", "wts"))])
+  y   <- dat$y
+  X   <- as.matrix(dat[, setdiff(names(dat), c("y", "wts"))])
   wts <- dat$wts
-  n <- length(y)
+  n   <- length(y)
 
-  # Optional subset of coefficients (columns of X)
+  # Subset coefficients
   if (!is.null(coef_subset)) {
     keep_cols <- colnames(X) %in% coef_subset
-    if (!any(keep_cols)) stop("No matching coefficients found in model.")
+    if (!any(keep_cols)) {
+      stop("None of the names in `coef_subset` matched the model coefficients: ",
+           paste(colnames(X), collapse = ", "))
+    }
     X <- X[, keep_cols, drop = FALSE]
   }
 
-  # Equal-weight baseline and chosen weights
-  w_null <- rep(mean(wts), n)
-  w_use <- if (normalize) (wts / mean(wts)) else wts
-
-  # Fast WLS helper in R
-  wls_fit <- function(X, y, w) {
-    WX <- X * w  # row-wise multiply columns by w
-    XtWX <- crossprod(X, WX)
-    XtWy <- crossprod(X, w * y)
-    beta <- solve(XtWX, XtWy)
-    mu <- as.numeric(X %*% beta)
-    resid <- y - mu
-    # weighted sigma^2 (pseudo-ML): sum(w*e^2)/sum(w)
-    sigma2 <- sum(w * resid^2) / sum(w)
-    list(beta = beta, mu = mu, resid = resid, sigma2 = sigma2, XtX = crossprod(X))
-  }
-
-  # Statistic calculators
-  pred_mean_stat <- function(beta) mean(as.numeric(X %*% beta))
-  coef_mahal_stat <- function(beta, beta0, XtX) {
-    # Mahalanobis distance with respect to unweighted precision X'X:
-    d <- beta - beta0 # delta^T (X'X) delta
-    as.numeric(t(d) %*% XtX %*% d)
-  }
-
-  # Baseline fits
-  fit_null <- wls_fit(X, y, if (normalize) (w_null / mean(w_null)) else w_null)
-  fit_alt  <- wls_fit(X, y, w_use)
-
-  stat_obs <- switch(stat,
-                     "pred_mean" = pred_mean_stat(fit_alt$beta),
-                     "coef_mahal" = coef_mahal_stat(fit_alt$beta, fit_null$beta, fit_null$XtX)
-  )
-  stat_null <- switch(stat,
-                      "pred_mean" = pred_mean_stat(fit_null$beta),
-                      "coef_mahal" = 0 # baseline difference is 0
-  )
-
-  # Generate permutations (within blocks if provided)
+  # Block validation
   if (!is.null(block)) {
+    if (length(block) != n) stop("`block` length must equal the number of observations (", n, ").")
     block <- droplevels(as.factor(block))
-    if (length(block) != n) stop("block must have length equal to number of observations.")
-    # Create index permutations by shuffling within block
+    if (nlevels(block) < 1L) stop("`block` must define at least one level.")
+  }
+
+  # Weights and baselines
+  w_null <- rep(mean(wts), n)
+  w_use  <- if (normalize) (wts / mean(wts)) else wts
+
+  fit_null <- .wls_fit(X, y, if (normalize) (w_null / mean(w_null)) else w_null)
+  fit_alt  <- .wls_fit(X, y, w_use)
+
+  stat_obs <- if (stat == "pred_mean") {
+    .pred_mean_stat(X, fit_alt$beta)
+  } else {
+    .coef_mahal_stat(fit_alt$beta, fit_null$beta, fit_null$XtX)
+  }
+  stat_null <- if (stat == "pred_mean") .pred_mean_stat(X, fit_null$beta) else 0
+
+  # Permutation indices
+  if (!is.null(block)) {
     perm_matrix <- matrix(NA_integer_, nrow = n, ncol = B)
     for (b in seq_len(B)) {
       idx <- seq_len(n)
@@ -143,14 +164,26 @@ perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
 
   # Compute permutation statistics
   if (!is.null(custom_fun)) {
-    # User-supplied statistic evaluated under actual and permuted weights
+    check_scalar <- function(val) {
+      if (!is.numeric(val) || length(val) != 1L || is.na(val)) {
+        stop("`custom_fun` must return a single non-missing numeric value.")
+      }
+      val
+    }
     perm_stats <- numeric(B)
     for (b in seq_len(B)) {
       w_b <- w_use[perm_matrix[, b]]
-      perm_stats[b] <- custom_fun(model, X, y, w_b)
+      perm_stats[b] <- check_scalar(custom_fun(model, X, y, w_b))
     }
-  } else if (engine == "C++") {
-    # Use C++ engine for speed (linear WLS and provided stats)
+
+  } else if (engine == "c++") {
+    if (!requireNamespace("Rcpp", quietly = TRUE)) {
+      stop("C++ engine requires Rcpp; install Rcpp or use engine = 'R'.")
+    }
+    cpp_stats <- c("pred_mean", "coef_mahal")
+    if (!stat %in% cpp_stats) {
+      stop("C++ engine does not support stat = '", stat, "'. Use engine = 'R' or a supported stat.")
+    }
     perm_stats <- perm_stats_cpp(
       X      = X,
       y      = y,
@@ -159,36 +192,22 @@ perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
       perm   = perm_matrix,
       stat   = stat
     )
-  } else {
-    # Pure R engine (optionally parallel via future.apply)
-    # Requires: library(future.apply); plan(multisession) or similar set by user.
-    calc_one <- function(col_idx) {
-      w_b <- w_use[perm_matrix[, col_idx]]
-      fit_b <- wls_fit(X, y, w_b)
-      switch(stat,
-             "pred_mean"  = pred_mean_stat(fit_b$beta),
-             "coef_mahal" = coef_mahal_stat(fit_b$beta, fit_null$beta, fit_null$XtX)
-      )
-    }
 
-    if (parallel) {
-      if (!requireNamespace("future.apply", quietly = TRUE)) {
-        warning("future.apply not available; falling back to serial execution.")
-        perm_stats <- sapply(seq_len(B), calc_one)
-      } else {
-        perm_stats <- future.apply::future_sapply(seq_len(B), calc_one)
-      }
-    } else {
-      perm_stats <- sapply(seq_len(B), calc_one)
+  } else {
+    # Pure R engine (serial only)
+    calc_one <- function(col_idx) {
+      idx <- perm_matrix[, col_idx]
+      .perm_eval_one(idx, X, y, w_use, fit_null$beta, fit_null$XtX, stat)
     }
+    perm_stats <- sapply(seq_len(B), calc_one)
   }
 
-  # Two-sided centered p-value relative to baseline
+  # P-value
   diffs <- abs(perm_stats - stat_null)
   obs_diff <- abs(stat_obs - stat_null)
   pval <- (1 + sum(diffs >= obs_diff)) / (B + 1)
 
-  out <- structure(list(
+  structure(list(
     stat_obs   = stat_obs,
     stat_null  = stat_null,
     perm_stats = perm_stats,
@@ -199,9 +218,10 @@ perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
     method     = paste0("Permutation test for weight informativeness (", stat, ")"),
     call       = match.call()
   ), class = "perm_test")
-
-  out
 }
+
+
+
 
 #' @rdname perm_test
 #' @method print perm_test
@@ -299,3 +319,88 @@ plot.perm_test <- function(x, bins = 30, col = "lightgray", line_col = "red", ..
                    legend = c("Observed statistic"),
                    col = line_col, lwd = 2, bty = "n")
 }
+
+
+#' Internal helper: Weighted least squares fit
+#'
+#' Performs a weighted least squares regression using QR decomposition,
+#' with a generalized inverse fallback if the system is singular.
+#'
+#' @param X Numeric design matrix.
+#' @param y Numeric response vector.
+#' @param w Numeric vector of weights.
+#'
+#' @return A list with elements \code{beta}, \code{mu}, \code{resid},
+#'   \code{sigma2}, and \code{XtX}.
+#' @keywords internal
+.wls_fit <- function(X, y, w) {
+  WX   <- X * w
+  XtWX <- crossprod(X, WX)
+  XtWy <- crossprod(X, w * y)
+  beta <- tryCatch(
+    {
+      b <- qr.solve(XtWX, XtWy)
+      as.matrix(b)
+    },
+    error = function(e) MASS::ginv(XtWX) %*% XtWy
+  )
+  mu     <- as.numeric(X %*% beta)
+  resid  <- y - mu
+  sigma2 <- sum(w * resid^2) / sum(w)
+  list(beta = beta, mu = mu, resid = resid, sigma2 = sigma2, XtX = crossprod(X))
+}
+
+#' Internal helper: Predicted mean statistic
+#'
+#' Computes the mean of fitted values given design matrix and coefficients.
+#'
+#' @param X Numeric design matrix.
+#' @param beta Coefficient vector.
+#'
+#' @return Numeric scalar, mean of predictions.
+#' @keywords internal
+.pred_mean_stat <- function(X, beta) {
+  mean(as.numeric(X %*% beta))
+}
+
+#' Internal helper: Mahalanobis coefficient distance
+#'
+#' Computes the Mahalanobis distance between two coefficient vectors
+#' using a supplied precision matrix.
+#'
+#' @param beta Estimated coefficient vector.
+#' @param beta0 Baseline coefficient vector.
+#' @param XtX Precision matrix (X'X).
+#'
+#' @return Numeric scalar distance.
+#' @keywords internal
+.coef_mahal_stat <- function(beta, beta0, XtX) {
+  d <- beta - beta0
+  as.numeric(t(d) %*% XtX %*% d)
+}
+
+#' Internal helper: Evaluate one permutation
+#'
+#' Computes the test statistic for a single permutation of weights.
+#'
+#' @param idx Integer index vector for permuted weights.
+#' @param X Numeric design matrix.
+#' @param y Numeric response vector.
+#' @param w_use Normalized weight vector.
+#' @param fit_null_beta Baseline coefficient vector.
+#' @param fit_null_XtX Baseline precision matrix.
+#' @param stat Character string, statistic type.
+#'
+#' @return Numeric scalar statistic.
+#' @keywords internal
+.perm_eval_one <- function(idx, X, y, w_use, fit_null_beta, fit_null_XtX, stat) {
+  w_b   <- w_use[idx]
+  fit_b <- .wls_fit(X, y, w_b)
+  if (stat == "pred_mean") {
+    .pred_mean_stat(X, fit_b$beta)
+  } else {
+    .coef_mahal_stat(fit_b$beta, fit_null_beta, fit_null_XtX)
+  }
+}
+
+

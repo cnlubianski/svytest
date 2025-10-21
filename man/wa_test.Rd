@@ -61,10 +61,45 @@ on covariates. Variants include DuMouchel-Duncan (DD), Pfeffermann-Sverchkov
 and Wu-Fuller (WF).
 }
 \details{
-Weight-association tests provide a diagnostic for whether survey weights
-are informative about the response variable after conditioning on covariates.
-They extend the general idea of specification testing to the survey-weighted
-regression context, with different formulations proposed in the literature.
+The following weight-association test variants are available:
+
+\itemize{
+  \item \strong{DuMouchel-Duncan (DD)}: Tests informativeness by regressing
+        residuals on the survey weights. One of the earliest approaches to
+        diagnosing weight effects in regression.
+        (DuMouchel & Duncan, 1983).
+
+  \item \strong{Pfeffermann-Sverchkov PS1}: Augments the regression with
+        functions of the weights as auxiliary regressors to test for
+        informativeness. Quadratic terms can be included (\code{"PS1q"}).
+        (Pfeffermann & Sverchkov, 1999).
+
+  \item \strong{Pfeffermann-Sverchkov PS2}: Uses a two-step approach with
+        fitted values from an auxiliary regression of weights on covariates
+        to construct test regressors. Quadratic terms can be included
+        (\code{"PS2q"}). (Pfeffermann & Sverchkov, 2003).
+
+  \item \strong{Wu-Fuller (WF)}: A preliminary test procedure that evaluates
+        whether weighted and unweighted regression estimates differ
+        significantly, providing a practical diagnostic for weight necessity.
+        (Wu & Fuller, 2005).
+}
+}
+\examples{
+if (requireNamespace("survey", quietly = TRUE)) {
+  # Load in survey package (required) and load in example data
+  library(survey)
+  data("svytestCE", package = "svytest")
+
+  # Create a survey design and fit a weighted regression model
+  des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+  fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+
+  # Run weight-association diagnostic test; reports F-stat, df's, and p-value
+  results <- wa_test(fit, type = "DD")
+  print(results)
+}
+
 }
 \references{
 DuMouchel, W. H., & Duncan, G. J. (1983).

@@ -1,7 +1,7 @@
 #' Run All Diagnostic Tests for Informative Weights
 #'
 #' This function runs all implemented diagnostic tests:
-#'   - \code{\link{wa_test}}() with types "DD","PS1","PS1q","PS2","PS2q","WF"
+#'   - \code{\link{wa_test}}() with types "DD", "PS1", "PS1q", "PS2", "PS2q", "WF"
 #'   - \code{\link{diff_in_coef_test}}()
 #'   - \code{\link{estim_eq_test}}()
 #'   - \code{\link{perm_test}}() with stats "pred_mean" and "coef_mahal"
@@ -34,18 +34,41 @@
 #'
 #' @export
 run_all_diagnostic_tests <- function(model, alpha = 0.05, B = 1000) {
+  # Argument checks
+  if (!inherits(model, "svyglm")) {
+    stop("`model` must be an object of class 'svyglm' (from the survey package).")
+  }
+
+  if (!is.numeric(alpha) || length(alpha) != 1L || is.na(alpha) ||
+      alpha <= 0 || alpha >= 1) {
+    stop("`alpha` must be a single numeric value strictly between 0 and 1.")
+  }
+
+  if (!is.numeric(B) || length(B) != 1L || is.na(B) || B < 1 || B != as.integer(B)) {
+    stop("`B` must be a positive integer (number of permutations).")
+  }
+  B <- as.integer(B)
+
+  # Function to ensure that all tests run safely
+  safe_run <- function(expr) {
+    tryCatch(expr, error = function(e) {
+      warning("Test failed: ", conditionMessage(e))
+      NULL
+    })
+  }
+
   # Run all tests
   tests <- list(
-    DD   = wa_test(model, type = "DD"),
-    PS1  = wa_test(model, type = "PS1"),
-    PS1q = wa_test(model, type = "PS1q"),
-    PS2  = wa_test(model, type = "PS2"),
-    PS2q = wa_test(model, type = "PS2q"),
-    WF   = wa_test(model, type = "WF"),
-    HP   = diff_in_coef_test(model, var_equal = TRUE),
-    PS3  = estim_eq_test(model),
-    perm_mean  = perm_test(model, stat = "pred_mean",  B = B, engine = "R"),
-    perm_mahal = perm_test(model, stat = "coef_mahal", B = B, engine = "R")
+    DD   = safe_run(wa_test(model, type = "DD")),
+    PS1  = safe_run(wa_test(model, type = "PS1")),
+    PS1q = safe_run(wa_test(model, type = "PS1q")),
+    PS2  = safe_run(wa_test(model, type = "PS2")),
+    PS2q = safe_run(wa_test(model, type = "PS2q")),
+    WF   = safe_run(wa_test(model, type = "WF")),
+    HP   = safe_run(diff_in_coef_test(model, var_equal = TRUE)),
+    PS3  = safe_run(estim_eq_test(model, q_method = "linear")),
+    perm_mean  = safe_run(perm_test(model, stat = "pred_mean",  B = B, engine = "R")),
+    perm_mahal = safe_run(perm_test(model, stat = "coef_mahal", B = B, engine = "R"))
   )
 
   # Extract comparable results into a tidy data frame
@@ -68,15 +91,13 @@ run_all_diagnostic_tests <- function(model, alpha = 0.05, B = 1000) {
                   ". Recommendation: unweighted regression may be acceptable.")
   }
 
-  structure(
-    list(
+  structure(list(
       results = res,
       recommendation = rec,
       raw = tests
-    ),
-    class = "run_all_diagnostic_tests"
-  )
+    ), class = "run_all_diagnostic_tests")
 }
+
 
 #' @rdname run_all_diagnostic_tests
 #' @method print run_all_diagnostic_tests

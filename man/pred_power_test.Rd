@@ -57,7 +57,7 @@ An object of class \code{"pred_power_test"} with fields:
   \item{call}{Matched call}
 }
 \description{
-Reimplements the predictive power test following Wang et al. (2023, Sec. 2.2):
+Implements the predictive power test following Wang et al. (2023, Sec. 2.2):
 split observations into estimation and validation sets; fit unweighted and weighted
 linear regressions on the estimation set; compute validation squared-error differences
 \eqn{D_i = (y_i - \hat y_{u,i})^2 - (y_i - \hat y_{w,i})^2}; test \eqn{H_0: E[D_i] = 0}

@@ -89,50 +89,104 @@
 #' @export
 wa_test <- function(model, type = c("DD", "PS1", "PS1q", "PS2", "PS2q", "WF"),
                     coef_subset = NULL, aux_design = NULL, na.action = stats::na.omit) {
-  # Quick checks
-  if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
-  type <- match.arg(type)
 
-  # Extract X, y, weights
-  wts <- stats::weights(model$survey.design)
-  X <- stats::model.matrix(model)
-  y <- stats::model.response(stats::model.frame(model))
+  # Argument check for svyglm object
+  if (!inherits(model, "svyglm")) {
+    stop("`model` must be an object of class 'svyglm' (from the survey package).")
+  }
 
-  # Missing data
+  # Argument check for type
+  valid_types <- c("DD", "PS1", "PS1q", "PS2", "PS2q", "WF")
+  if (length(type) != 1L || !is.character(type)) {
+    stop("`type` must be a single character string.")
+  }
+  if (!type %in% valid_types) {
+    stop("Invalid `type`: must be one of ", paste(valid_types, collapse = ", "), ".")
+  }
+
+  # Argument check for coefficient subset, custom auxiliary design, and na.action function arguments
+  if (!is.null(coef_subset) && !is.character(coef_subset)) {
+    stop("`coef_subset` must be a character vector of coefficient names.")
+  }
+  if (!is.null(aux_design) && !(is.function(aux_design) || is.matrix(aux_design))) {
+    stop("`aux_design` must be NULL, a function, or a numeric matrix.")
+  }
+  if (!is.function(na.action)) {
+    stop("`na.action` must be a function (e.g., stats::na.omit).")
+  }
+
+  # Extract design matrices
+  wts <- tryCatch(stats::weights(model$survey.design),
+                  error = function(e) stop("Could not extract weights from `model$survey.design`."))
+
+  X <- tryCatch(stats::model.matrix(model),
+                error = function(e) stop("Could not extract model matrix from `model`."))
+
+  y <- tryCatch(stats::model.response(stats::model.frame(model)),
+                error = function(e) stop("Could not extract response from `model`."))
+
+  if (length(y) != nrow(X) || length(y) != length(wts)) {
+    stop("Mismatch in dimensions of response, design matrix, and weights.")
+  }
+
+  # Handle missing data and assign the objects
   dat <- data.frame(y = y, X, wts = wts)
   dat <- na.action(dat)
   y <- dat$y
   X <- as.matrix(dat[, setdiff(names(dat), c("y", "wts"))])
   wts <- dat$wts
 
-  # Optionally subset coefficients
+  # Subset coefficients if specified
   if (!is.null(coef_subset)) {
     keep_cols <- colnames(X) %in% coef_subset
-    if (!any(keep_cols)) stop("No matching coefficients found in model.")
+    if (!any(keep_cols)) {
+      stop("None of the names in `coef_subset` matched the model coefficients: ",
+           paste(colnames(X), collapse = ", "))
+    }
     X <- X[, keep_cols, drop = FALSE]
   }
 
-  # Dispatch
+  # Check auxiliary design matrix if provided
+  if (!is.null(aux_design) && type %in% c("PS1", "PS1q", "PS2", "PS2q")) {
+    A <- if (is.function(aux_design)) {
+      aux_design(model, X, y, wts)
+    } else {
+      aux_design
+    }
+    if (!is.matrix(A) || !is.numeric(A)) {
+      stop("`aux_design` must be a numeric matrix (or a function returning one).")
+    }
+    if (nrow(A) != nrow(X)) {
+      stop("`aux_design` must have the same number of rows as the model matrix.")
+    }
+
+    qrA <- qr(A, LAPACK = TRUE)
+    if (qrA$rank < ncol(A)) {
+      stop("The supplied auxiliary design matrix is rank-deficient (perfect collinearity). ",
+           "Please remove redundant columns or supply a full-rank matrix.")
+    }
+  }
+
+  # Dispatch to test type functions
   out <- switch(type,
                 "DD"   = wa_DD(y, X, wts),
                 "PS1"  = wa_PS1(y, X, wts, quadratic = FALSE, aux_design = aux_design),
-                "PS1q" = wa_PS1(y, X, wts, quadratic = TRUE,  aux_design = aux_design),
+                "PS1q" = wa_PS1(y, X, wts, quadratic = TRUE, aux_design = aux_design),
                 "PS2"  = wa_PS2(y, X, wts, quadratic = FALSE, aux_design = aux_design),
-                "PS2q" = wa_PS2(y, X, wts, quadratic = TRUE,  aux_design = aux_design),
-                "WF"   = wa_WF(y, X, wts)
-  )
+                "PS2q" = wa_PS2(y, X, wts, quadratic = TRUE, aux_design = aux_design),
+                "WF"   = wa_WF(y, X, wts))
 
-  structure(
-    list(
+  # Return structured result
+  structure(list(
       statistic = out$statistic,
       parameter = out$df,
       p.value   = out$p.value,
       method    = out$method,
       call      = match.call()
-    ),
-    class = "wa_test"
-  )
+    ), class = "wa_test")
 }
+
+
 
 #' @rdname wa_test
 #' @method print wa_test
@@ -174,11 +228,11 @@ wa_DD <- function(y, X, wts) {
   X_tilde <- W %*% X
   X_comb <- cbind(X, X_tilde)
 
-  betas_full <- solve(t(X_comb) %*% X_comb) %*% t(X_comb) %*% y
+  betas_full <- qr.solve(X_comb, y)
   RSS_full <- sum((y - X_comb %*% betas_full)^2)
 
   X_reduced <- X
-  betas_reduced <- solve(t(X_reduced) %*% X_reduced) %*% t(X_reduced) %*% y
+  betas_reduced <- qr.solve(X_reduced, y)
   RSS_reduced <- sum((y - X_reduced %*% betas_reduced)^2)
 
   df1 <- ncol(X_tilde)
@@ -196,18 +250,18 @@ wa_WF <- function(y, X, wts) {
 
   # Auxiliary: regress weights on 1, X, X^2 -> construct q = w / w_hat
   X_aux <- cbind(1, X_main, X_main^2)
-  eta <- solve(t(X_aux) %*% X_aux) %*% t(X_aux) %*% wts
+  eta <- qr.solve(X_aux, wts)
   w_hat <- X_aux %*% eta
   q <- as.numeric(wts / w_hat)
 
   # Full: y ~ X + (diag(q) %*% X_main)
   X_tilde <- diag(q) %*% X_main
   X_full <- cbind(1, X_main, X_tilde)
-  b_full <- solve(t(X_full) %*% X_full) %*% t(X_full) %*% y
+  b_full <- qr.solve(X_full, y)
   RSS_full <- sum((y - X_full %*% b_full)^2)
 
   # Reduced: y ~ X
-  b_red <- solve(t(X) %*% X) %*% t(X) %*% y
+  b_red <- qr.solve(X, y)
   RSS_red <- sum((y - X %*% b_red)^2)
 
   df1 <- ncol(X_tilde)
@@ -221,12 +275,11 @@ wa_WF <- function(y, X, wts) {
 #' Pfeffermann-Sverchkov Test 1
 #' @keywords internal
 wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
-  betas_u <- solve(t(X) %*% X) %*% t(X) %*% y
+  betas_u <- qr.solve(X, y)
   residuals <- y - X %*% betas_u
   res_diag <- diag(as.vector(residuals))
   X_main <- X[, -1, drop = FALSE]
 
-  # Build auxiliary terms
   if (!is.null(aux_design)) {
     extra <- if (is.function(aux_design)) aux_design(X_main, y) else aux_design
     method <- "Pfeffermann-Sverchkov WA Test 1 (Custom Aux)"
@@ -240,17 +293,18 @@ wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
 
   # Full model
   X_design <- cbind(1, X_main, extra, residuals, residuals^2, res_diag %*% X_main)
-  betas <- qr.solve(X_design, wts) # More robust to collinearity than solve()
+  .check_full_rank(X_design, "full PS1 design")
+  betas <- qr.solve(X_design, wts)
   W_hat <- X_design %*% betas
   RSS <- sum((wts - W_hat)^2)
 
   # Reduced model
   X_reduced <- cbind(1, X_main)
-  betas_reduced <- qr.solve(X_reduced, wts) # More robust to collinearity than solve()
+  .check_full_rank(X_reduced, "reduced PS1 design")
+  betas_reduced <- qr.solve(X_reduced, wts)
   W_hat_reduced <- X_reduced %*% betas_reduced
   TSS <- sum((wts - W_hat_reduced)^2)
 
-  # Compute df, test statistic, and p-value, then return
   df1 <- ncol(X_design) - (ncol(X_main) + 1)
   df2 <- nrow(X_design) - ncol(X_design)
   F_stat <- ((TSS - RSS) / df1) / (RSS / df2)
@@ -258,6 +312,7 @@ wa_PS1 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
        p.value = 1 - stats::pf(F_stat, df1, df2),
        method = method)
 }
+
 
 #' Pfeffermann-Sverchkov Test 2
 #' @keywords internal
@@ -282,9 +337,11 @@ wa_PS2 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
     added_cols <- 2
   }
 
+  .check_full_rank(XY_full, "full PS2 design")
   betas_full <- qr.solve(XY_full, wts)
   RSS_full <- sum((wts - XY_full %*% betas_full)^2)
 
+  .check_full_rank(XY_reduced, "reduced PS2 design")
   betas_reduced <- qr.solve(XY_reduced, wts)
   RSS_reduced <- sum((wts - XY_reduced %*% betas_reduced)^2)
 
@@ -295,6 +352,7 @@ wa_PS2 <- function(y, X, wts, quadratic = FALSE, aux_design = NULL) {
        p.value = 1 - stats::pf(F_stat, df1, df2),
        method = method)
 }
+
 
 #' @rdname wa_test
 #' @method tidy wa_test
@@ -323,4 +381,19 @@ glance.wa_test <- function(x, ...) {
     p.value   = x$p.value,
     method    = x$method
   )
+}
+
+#' Internal: check full rank before solving
+#' @keywords internal
+.check_full_rank <- function(M, name = "design matrix") {
+  qrM <- qr(M, LAPACK = TRUE)
+  if (qrM$rank < ncol(M)) {
+    stop(sprintf(
+      "The %s is rank-deficient (perfect collinearity detected). ",
+      name
+    ),
+    "Please remove redundant columns or supply a full-rank auxiliary design.",
+    call. = FALSE)
+  }
+  invisible(TRUE)
 }

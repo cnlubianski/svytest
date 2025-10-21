@@ -64,22 +64,56 @@
 diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
                               robust_type = c("HC0", "HC1", "HC2", "HC3"),
                               coef_subset = NULL, na.action = stats::na.omit) {
-  if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
-  robust_type <- match.arg(robust_type)
+
+  # Argument checks
+  if (!inherits(model, "svyglm")) {
+    stop("`model` must be an object of class 'svyglm' (from the survey package).")
+  }
+
+  if (!is.logical(lower.tail) || length(lower.tail) != 1L || is.na(lower.tail)) {
+    stop("`lower.tail` must be a single logical value (TRUE/FALSE).")
+  }
+
+  if (!is.logical(var_equal) || length(var_equal) != 1L || is.na(var_equal)) {
+    stop("`var_equal` must be a single logical value (TRUE/FALSE).")
+  }
+
+  valid_types <- c("HC0", "HC1", "HC2", "HC3")
+  if (!var_equal && !robust_type %in% valid_types) {
+    stop("`robust_type` must be one of: ", paste(valid_types, collapse = ", "), ".")
+  }
+
+  # Argument check for coef_subset type
+  if (!is.null(coef_subset) && !is.character(coef_subset)) {
+    stop("`coef_subset` must be a character vector of coefficient names.")
+  }
+
+  if (!is.function(na.action)) {
+    stop("`na.action` must be a function (e.g., stats::na.omit).")
+  }
 
   # Extract design matrix, response, and weights
-  wts <- stats::weights(model$survey.design)
-  X <- stats::model.matrix(model)
-  y <- stats::model.response(stats::model.frame(model))
+  wts <- tryCatch(stats::weights(model$survey.design),
+                  error = function(e) stop("Could not extract weights from `model$survey.design`."))
 
-  # Handle missing data
+  X <- tryCatch(stats::model.matrix(model),
+                error = function(e) stop("Could not extract model matrix from `model`."))
+
+  y <- tryCatch(stats::model.response(stats::model.frame(model)),
+                error = function(e) stop("Could not extract response from `model`."))
+
+  if (length(y) != nrow(X) || length(y) != length(wts)) {
+    stop("Mismatch in dimensions of response, design matrix, and weights.")
+  }
+
+  # Handle missing and extract data into objects
   dat <- data.frame(y = y, X, wts = wts)
   dat <- na.action(dat)
   y <- dat$y
   X <- as.matrix(dat[, setdiff(names(dat), c("y", "wts"))])
   wts <- dat$wts
 
-  # Warn if weights are constant (tolerance ~1e-8)
+  # Warn if weights are constant
   if (all(abs(wts - mean(wts)) < .Machine$double.eps^0.5)) {
     warning("All weights are constant; the test is not meaningful.")
   }
@@ -87,16 +121,25 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
   # Optionally subset coefficients
   if (!is.null(coef_subset)) {
     keep_cols <- colnames(X) %in% coef_subset
-    if (!any(keep_cols)) stop("No matching coefficients found in model.")
+    if (!any(keep_cols)) {
+      stop("None of the names in `coef_subset` matched the model coefficients: ",
+           paste(colnames(X), collapse = ", "))
+    }
     X <- X[, keep_cols, drop = FALSE]
   }
 
   # Unweighted coefficients
-  betas_u <- solve(t(X) %*% X) %*% t(X) %*% y
+  betas_u <- tryCatch(
+    solve(t(X) %*% X, t(X) %*% y),
+    error = function(e) stop("Unweighted OLS failed: design matrix may be singular.")
+  )
 
   # Weighted coefficients
   W <- diag(wts, nrow = length(wts))
-  betas_w <- solve(t(X) %*% W %*% X) %*% t(X) %*% W %*% y
+  betas_w <- tryCatch(
+    solve(t(X) %*% W %*% X, t(X) %*% W %*% y),
+    error = function(e) stop("Weighted regression failed: weighted design matrix may be singular.")
+  )
 
   # A matrix (p x n)
   A <- (solve(t(X) %*% W %*% X) %*% t(X) %*% W) -
@@ -104,23 +147,19 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
 
   # Variance estimation
   if (var_equal) {
-    # Equal variance assumption
     y_hat <- X %*% betas_u
     residuals <- y - y_hat
     SSE <- sum(residuals^2)
     sigma_sq_hat <- SSE / (length(y) - length(betas_u))
     V_hat <- sigma_sq_hat * A %*% t(A)
   } else {
-    # Heteroskedasticity-robust variance
     resid_w <- y - X %*% betas_w
     resid_u <- y - X %*% betas_u
     diff_resid <- as.numeric(resid_w - resid_u)
 
-    # Leverage values for HC2/HC3
     H <- X %*% solve(t(X) %*% X) %*% t(X)
     h_ii <- diag(H)
 
-    # Adjust residuals depending on robust_type
     if (robust_type == "HC0") {
       adj_resid <- diff_resid
     } else if (robust_type == "HC1") {
@@ -131,16 +170,16 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
       adj_resid <- diff_resid / (1 - h_ii)
     }
 
-    # Middle matrix of sandwich
     V_hat <- A %*% (t(A) * adj_resid^2)
   }
 
-  # Test statistic
+  # Compute test statistic
   diff_betas <- betas_w - betas_u
-  Chi_statistic <- as.numeric(t(diff_betas) %*% solve(V_hat) %*% diff_betas)
+  Chi_statistic <- as.numeric(t(diff_betas) %*% solve(V_hat, diff_betas))
   df <- length(betas_u)
   p_value <- stats::pchisq(Chi_statistic, df = df, lower.tail = lower.tail)
 
+  # Return structured result
   structure(
     list(
       statistic = Chi_statistic,
@@ -148,7 +187,7 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
       p.value = p_value,
       method = "Hausman-Pfeffermann Difference-in-Coefficients Test",
       betas_unweighted = setNames(as.vector(betas_u), names(coef(model))),
-      betas_weighted = setNames(as.vector(betas_w), names(coef(model))),
+      betas_weighted   = setNames(as.vector(betas_w), names(coef(model))),
       vcov_diff = V_hat,
       diff_betas = as.vector(diff_betas),
       call = match.call()
@@ -156,6 +195,8 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
     class = "diff_in_coef_test"
   )
 }
+
+
 
 #' @rdname diff_in_coef_test
 #' @method print diff_in_coef_test

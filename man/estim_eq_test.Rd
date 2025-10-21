@@ -71,20 +71,18 @@ The test statistic is based on \eqn{R_i = (1 - q_i) u_i}, where
 \eqn{F = \frac{n-p}{p} \bar R^\top S^{-1} \bar R}, with df1 = p, df2 = n - p.
 }
 \examples{
-\dontrun{
-library(survey)
-set.seed(123)
-n <- 200
-x <- rnorm(n)
-y <- 1 + 2*x + rnorm(n)
-w <- 1 + (y - min(y))
-dat <- data.frame(y, x, w)
-des <- svydesign(ids = ~1, weights = ~w, data = dat)
-fit <- svyglm(y ~ x, design = des, family = gaussian())
+if (requireNamespace("survey", quietly = TRUE)) {
+  # Load in survey package (required) and load in example data
+  library(survey)
+  data("svytestCE", package = "svytest")
 
-res <- estim_eq_test(fit, q_method = "linear")
-print(res)
-summary(res)
+  # Create a survey design and fit a weighted regression model
+  des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+  fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+
+  # Run estimating equations diagnostic test; reports F statistic, df's, and p-value
+  results <- estim_eq_test(fit, q_method = "linear")
+  print(results)
 }
 
 }
@@ -94,6 +92,5 @@ Fitting generalized linear models under informative sampling.
 In R. L. Chambers & C. J. Skinner (Eds.), *Analysis of Survey Data* (Ch. 12). Wiley.
 }
 \seealso{
-\code{\link{diff_in_coef_test}}, \code{\link{lr_test}},
-   \code{\link{wa_test}}, \code{\link{perm_test}}
+\code{\link{diff_in_coef_test}}, \code{\link{wa_test}}, \code{\link{perm_test}}
 }

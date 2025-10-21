@@ -72,15 +72,19 @@ weights materially affect model results. The procedure is often
 called the Difference-in-Coefficients test.
 }
 \examples{
-if (requireNamespace("survey", quietly = TRUE) &&
-    exists("svytestCE", where = "package:svytest")) {
+if (requireNamespace("survey", quietly = TRUE)) {
+  # Load in survey package (required) and load in example data
   library(survey)
   data("svytestCE", package = "svytest")
+
+  # Create a survey design and fit a weighted regression model
   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
-  fit_svy <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE,
-                    design = des)
-  results <- diff_in_coef_test(fit_svy, var_equal = FALSE, robust_type = "HC3")
-  print(results)
+  fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+
+  # Run difference-in-coefficients diagnostic test versions with different variance assumptions
+  # and reports Chi-Squared statistic, df, and p-value
+  summary(diff_in_coef_test(fit, var_equal = TRUE))
+  summary(diff_in_coef_test(fit, var_equal = FALSE, robust_type = "HC3"))
 }
 
 }

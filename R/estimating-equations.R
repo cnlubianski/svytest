@@ -58,19 +58,47 @@
 #' @export
 estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log"),
                           stabilize = TRUE, na.action = stats::na.omit) {
-  if (!inherits(model, "svyglm")) stop("Model must be of class 'svyglm'.")
+
+  # Argument checks
+  if (!inherits(model, "svyglm")) {
+    stop("`model` must be an object of class 'svyglm' (from the survey package).")
+  }
+
   fam <- model$family
   if (!(fam$family == "gaussian" && fam$link == "identity")) {
-    stop("estim_eq_test currently supports only gaussian(identity) models.")
+    stop("`estim_eq_test` currently supports only gaussian(identity) models.")
   }
-  q_method <- match.arg(q_method)
+
+  q_method <- match.arg(q_method, choices = c("linear", "log"))
+
+  # Argument check for coef_subset type
+  if (!is.null(coef_subset) && !is.character(coef_subset)) {
+    stop("`coef_subset` must be a character vector of coefficient names.")
+  }
+
+  if (!is.logical(stabilize) || length(stabilize) != 1L || is.na(stabilize)) {
+    stop("`stabilize` must be a single logical value (TRUE/FALSE).")
+  }
+
+  if (!is.function(na.action)) {
+    stop("`na.action` must be a function (e.g., stats::na.omit).")
+  }
 
   # Extract data
-  w <- stats::weights(model$survey.design)
-  X_full <- stats::model.matrix(model)
-  y <- stats::model.response(stats::model.frame(model))
+  w <- tryCatch(stats::weights(model$survey.design),
+                error = function(e) stop("Could not extract weights from `model$survey.design`."))
 
-  # Handle missing
+  X_full <- tryCatch(stats::model.matrix(model),
+                     error = function(e) stop("Could not extract model matrix from `model`."))
+
+  y <- tryCatch(stats::model.response(stats::model.frame(model)),
+                error = function(e) stop("Could not extract response from `model`."))
+
+  if (length(y) != nrow(X_full) || length(y) != length(w)) {
+    stop("Mismatch in dimensions of response, design matrix, and weights.")
+  }
+
+  # Handle missing and extract data into objects
   dat <- data.frame(y = y, X_full, w = w)
   dat <- na.action(dat)
   y <- dat$y
@@ -82,13 +110,19 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
   terms <- colnames(X)
   if (!is.null(coef_subset)) {
     keep <- colnames(X) %in% coef_subset
-    if (!any(keep)) stop("No matching coefficients found in model matrix.")
+    if (!any(keep)) {
+      stop("None of the names in `coef_subset` matched the model coefficients: ",
+           paste(colnames(X), collapse = ", "))
+    }
     X <- X[, keep, drop = FALSE]
     terms <- colnames(X)
   }
 
   # Unweighted OLS
-  beta_hat <- solve(crossprod(X), crossprod(X, y))
+  beta_hat <- tryCatch(
+    solve(crossprod(X), crossprod(X, y)),
+    error = function(e) stop("Unweighted OLS failed: design matrix may be singular.")
+  )
   resid <- y - X %*% beta_hat
   U <- sweep(X, 1, resid, `*`) # scores
 
@@ -110,12 +144,11 @@ estim_eq_test <- function(model, coef_subset = NULL, q_method = c("linear", "log
     q <- pmax(pmin(q, hi), lo)
   }
 
-  # R_i = (1 - q_i) u_i
+  # Compute test statistic
   R <- sweep(U, 1, (1 - q), `*`)
   Rbar <- colMeans(R)
   S <- stats::cov(R)
 
-  # Hotelling F
   n <- nrow(X); p <- ncol(X)
   Fstat <- as.numeric(((n - p) / p) * (t(Rbar) %*% solve(S, Rbar)))
   pval <- stats::pf(Fstat, df1 = p, df2 = n - p, lower.tail = FALSE)

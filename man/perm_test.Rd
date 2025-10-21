@@ -17,7 +17,6 @@ perm_test(
   normalize = TRUE,
   engine = c("C++", "R"),
   custom_fun = NULL,
-  parallel = FALSE,
   na.action = stats::na.omit
 )
 
@@ -58,8 +57,6 @@ perm_test(
 
 \item{custom_fun}{Optional function(model, X, y, wts) -> scalar statistic (overrides \code{stat}).}
 
-\item{parallel}{Logical; if TRUE and engine is "R", uses future.apply for parallel permutations.}
-
 \item{na.action}{Function to handle missing data.}
 
 \item{x}{An object of class perm_test}
@@ -83,5 +80,21 @@ An object of class \code{"perm_test"} with fields:
 \description{
 Non-parametric test that permutes survey weights (optionally within blocks)
 to generate the null distribution of a chosen statistic. Supports fast closed-form
-WLS (linear case) via C++ and a pure R engine (with optional future.apply parallelization).
+WLS (linear case) via C++ and a pure R engine.
+}
+\examples{
+if (requireNamespace("survey", quietly = TRUE)) {
+  # Load in survey package (required) and load in example data
+  library(survey)
+  data("svytestCE", package = "svytest")
+
+  # Create a survey design and fit a weighted regression model
+  des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+  fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+
+  # Run permutation diagnostic test; reports permutation statistics with p-value
+  results <- perm_test(fit, stat = "pred_mean", B = 1000, engine = "R")
+  print(results)
+}
+
 }

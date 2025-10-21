@@ -5,7 +5,7 @@
 \alias{print.run_all_diagnostic_tests}
 \title{Run All Diagnostic Tests for Informative Weights}
 \usage{
-run_all_diagnostic_tests(model, alpha = 0.05)
+run_all_diagnostic_tests(model, alpha = 0.05, B = 1000)
 
 \method{print}{run_all_diagnostic_tests}(x, ...)
 }
@@ -26,10 +26,26 @@ A list with:
 }
 \description{
 This function runs all implemented diagnostic tests:
-  - \code{\link{wa_test}}() with types "DD","PS1","PS1q","PS2","PS2q","WF"
+  - \code{\link{wa_test}}() with types "DD", "PS1", "PS1q", "PS2", "PS2q", "WF"
   - \code{\link{diff_in_coef_test}}()
   - \code{\link{estim_eq_test}}()
   - \code{\link{perm_test}}() with stats "pred_mean" and "coef_mahal"
+}
+\examples{
+if (requireNamespace("survey", quietly = TRUE)) {
+  # Load in survey package (required) and load in example data
+  library(survey)
+  data("svytestCE", package = "svytest")
+
+  # Create a survey design and fit a weighted regression model
+  des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+  fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+
+  # Run all diagnostic tests and return a list of statistics, including a recommendation
+  results <- run_all_diagnostic_tests(fit)
+  print(results)
+}
+
 }
 \seealso{
 \code{\link{wa_test}}, \code{\link{diff_in_coef_test}},
