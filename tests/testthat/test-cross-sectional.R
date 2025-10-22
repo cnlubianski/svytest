@@ -44,6 +44,10 @@ test_that("run_all_diagnostic_tests returns expected structure", {
 test_that("each diagnostic's rejection rate increases with informativeness", {
   skip_on_cran()
   skip_if_not_installed("survey")
+  skip_if_not_installed("sampling")
+  skip_if_not_installed("dplyr")
+  skip_if_not_installed("tidyr")
+
   library(survey)
   library(dplyr)
   library(sampling)
@@ -107,7 +111,6 @@ test_that("each diagnostic's rejection rate increases with informativeness", {
     # Iterate through each case
     for (case in 1:nrow(cases)) {
       param <- cases[case, ]
-      message("Running case ", case, " of ", nrow(cases))
 
       # Parallel replications
       reps <- future_lapply(seq_len(B), function(b) {

@@ -8,6 +8,7 @@
 #'
 #' @param model A fitted \code{svyglm} object.
 #' @param alpha Critical value for rejection (default 0.05).
+#' @param B Number of permutations for permutation tests (default 1000).
 #'
 #' @return A list with:
 #'   \item{results}{Data frame of test names, statistics, p-values, reject indicator}
@@ -15,22 +16,22 @@
 #'   \item{raw}{List of raw test outputs, including permutation test objects}
 #'
 #' @examples
-#' if (requireNamespace("survey", quietly = TRUE)) {
-#'   # Load in survey package (required) and load in example data
-#'   library(survey)
-#'   data("svytestCE", package = "svytest")
+#' # Load in survey package (required) and load in example data
+#' library(survey)
+#' data(api, package = "survey")
 #'
-#'   # Create a survey design and fit a weighted regression model
-#'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
-#'   fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+#' # Create a survey design and fit a weighted regression model
+#' des <- svydesign(id = ~1, strata = ~stype, weights = ~pw, data = apistrat)
+#' fit <- svyglm(api00 ~ ell + meals, design = des)
 #'
-#'   # Run all diagnostic tests and return a list of statistics, including a recommendation
-#'   results <- run_all_diagnostic_tests(fit)
-#'   print(results)
-#' }
+#' # Run all diagnostic tests and return a list of statistics, including a recommendation
+#' results <- run_all_diagnostic_tests(fit)
+#' print(results)
 #'
 #' @seealso \code{\link{wa_test}}, \code{\link{diff_in_coef_test}},
 #'   \code{\link{estim_eq_test}}, \code{\link{perm_test}}
+#'
+#' @importFrom survey svyglm
 #'
 #' @export
 run_all_diagnostic_tests <- function(model, alpha = 0.05, B = 1000) {

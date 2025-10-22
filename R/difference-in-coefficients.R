@@ -25,28 +25,43 @@
 #'   \item{call}{Function call}
 #'
 #' @examples
-#' if (requireNamespace("survey", quietly = TRUE)) {
-#'   # Load in survey package (required) and load in example data
-#'   library(survey)
-#'   data("svytestCE", package = "svytest")
+#' # Load in survey package (required) and load in example data
+#' library(survey)
+#' data(api, package = "survey")
 #'
-#'   # Create a survey design and fit a weighted regression model
-#'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
-#'   fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+#' # Create a survey design and fit a weighted regression model
+#' des <- svydesign(id = ~1, strata = ~stype, weights = ~pw, data = apistrat)
+#' fit <- svyglm(api00 ~ ell + meals, design = des)
 #'
-#'   # Run difference-in-coefficients diagnostic test versions with different variance assumptions
-#'   # and reports Chi-Squared statistic, df, and p-value
-#'   summary(diff_in_coef_test(fit, var_equal = TRUE))
-#'   summary(diff_in_coef_test(fit, var_equal = FALSE, robust_type = "HC3"))
-#' }
+#' # Run difference-in-coefficients diagnostic test versions with different variance assumptions
+#' # and reports Chi-Squared statistic, df, and p-value
+#' summary(diff_in_coef_test(fit, var_equal = TRUE))
+#' summary(diff_in_coef_test(fit, var_equal = FALSE, robust_type = "HC3"))
 #'
 #' @details
-#' This test adapts the general Hausman specification test
-#' (Hausman, 1978) to the survey-weighted regression setting.
-#' Pfeffermann (1993) showed how comparing weighted and unweighted
-#' coefficient estimates provides a diagnostic for whether survey
-#' weights materially affect model results. The procedure is often
-#' called the Difference-in-Coefficients test.
+#' Let \eqn{X} denote the design matrix and \eqn{y} the response vector.
+#' Define the unweighted OLS estimator
+#' \deqn{\hat\beta_{U} = (X^\top X)^{-1} X^\top y,}
+#' and the survey-weighted estimator
+#' \deqn{\hat\beta_{W} = (X^\top W X)^{-1} X^\top W y,}
+#' where \eqn{W = \mathrm{diag}(w_1, \ldots, w_n)} is the diagonal matrix of survey weights.
+#'
+#' The test statistic is based on the difference
+#' \deqn{d = \hat\beta_{W} - \hat\beta_{U}.}
+#'
+#' Under the null hypothesis that weights are not informative,
+#' \eqn{d} has mean zero and variance \eqn{V_d}.
+#' The test statistic is
+#' \deqn{T = d^\top V_d^{-1} d,}
+#' which is asymptotically \eqn{\chi^2_p} distributed with
+#' \eqn{p} equal to the number of coefficients tested.
+#'
+#' If \code{var_equal = TRUE}, \eqn{V_d} is estimated assuming equal residual variance
+#' across weighted and unweighted models. If \code{var_equal = FALSE}, a
+#' heteroskedasticity-robust estimator (e.g. HC0–HC3) is used.
+#'
+#' This test is a survey-weighted adaptation of the Hausman specification test
+#' (Hausman, 1978), as proposed by Pfeffermann (1993).
 #'
 #' @references
 #' Hausman, J. A. (1978). Specification Tests in Econometrics.
@@ -59,6 +74,8 @@
 #' \code{\link{svytestCE}} for the curated Consumer Expenditure dataset
 #'   included in this package, which can be used to demonstrate the
 #'   Difference-in-Coefficients test.
+#'
+#'   @importFrom survey svyglm
 #'
 #' @export
 diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
@@ -186,8 +203,8 @@ diff_in_coef_test <- function(model, lower.tail = FALSE, var_equal = TRUE,
       parameter = df,
       p.value = p_value,
       method = "Hausman-Pfeffermann Difference-in-Coefficients Test",
-      betas_unweighted = setNames(as.vector(betas_u), names(coef(model))),
-      betas_weighted   = setNames(as.vector(betas_w), names(coef(model))),
+      betas_unweighted = stats::setNames(as.vector(betas_u), names(stats::coef(model))),
+      betas_weighted = stats::setNames(as.vector(betas_w), names(stats::coef(model))),
       vcov_diff = V_hat,
       diff_betas = as.vector(diff_betas),
       call = match.call()

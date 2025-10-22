@@ -15,7 +15,7 @@ test_that("estim_eq_test rejects invalid arguments", {
   expect_error(estim_eq_test(fit_binom), "supports only gaussian\\(identity\\) models")
 
   # Invalid q_method
-  expect_error(estim_eq_test(fit, q_method = "bad"), "`q_method` must be one of")
+  expect_error(estim_eq_test(fit, q_method = "bad"), regexp = "should be one of")
 
   # Invalid coef_subset
   expect_error(estim_eq_test(fit, q_method = "linear", coef_subset = 123),

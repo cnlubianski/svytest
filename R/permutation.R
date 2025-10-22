@@ -37,23 +37,71 @@
 #'   \item{call}{Matched call}
 #'   \item{method}{Description string}
 #'
-#' @examples
-#' if (requireNamespace("survey", quietly = TRUE)) {
-#'   # Load in survey package (required) and load in example data
-#'   library(survey)
-#'   data("svytestCE", package = "svytest")
+#' @details
+#' This procedure implements a non‑parametric randomization test for the
+#' informativeness of survey weights. The null hypothesis is that, conditional
+#' on the covariates \eqn{X}, the survey weights \eqn{w} are \emph{non‑informative}
+#' with respect to the outcome \eqn{y}. Under this null, permuting the weights
+#' across observations should not change the distribution of any statistic that
+#' measures the effect of weighting.
 #'
-#'   # Create a survey design and fit a weighted regression model
-#'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
-#'   fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+#' The algorithm is:
+#' \enumerate{
+#'   \item Fit the unweighted regression
+#'     \deqn{\hat\beta_{U} = (X^\top X)^{-1} X^\top y}
+#'     and the weighted regression
+#'     \deqn{\hat\beta_{W} = (X^\top W X)^{-1} X^\top W y,}
+#'     where \eqn{W = \mathrm{diag}(w)}.
 #'
-#'   # Run permutation diagnostic test; reports permutation statistics with p-value
-#'   results <- perm_test(fit, stat = "pred_mean", B = 1000, engine = "R")
-#'   print(results)
+#'   \item Compute the observed test statistic \eqn{T_{\mathrm{obs}}}:
+#'     \itemize{
+#'       \item For \code{"pred_mean"}: the difference in mean predicted outcomes
+#'             between weighted and unweighted fits.
+#'       \item For \code{"coef_mahal"}: the Mahalanobis distance
+#'             \deqn{T = (\hat\beta_{W} - \hat\beta_{U})^\top
+#'                        (X^\top X)(\hat\beta_{W} - \hat\beta_{U}),}
+#'             using the unweighted precision matrix as the metric.
+#'       \item For a user‑supplied \code{custom_fun}, any scalar function of
+#'             \eqn{(X,y,w)}.
+#'     }
+#'
+#'   \item Generate the null distribution by permuting the weights:
+#'     \deqn{w^{*(b)} = P_b w, \quad b=1,\ldots,B,}
+#'     where each \eqn{P_b} is a permutation matrix. If a \code{block} factor
+#'     is supplied, permutations are restricted within block levels.
+#'
+#'   \item Recompute the test statistic \eqn{T^{*(b)}} for each permuted weight
+#'     vector. The empirical distribution of \eqn{T^{*(b)}} represents the null
+#'     distribution under non‑informative weights.
+#'
+#'   \item The two‑sided permutation p‑value is
+#'     \deqn{p = \frac{1 + \sum_{b=1}^B I\{|T^{*(b)} - T_0| \ge |T_{\mathrm{obs}} - T_0|\}}
+#'                 {B+1},}
+#'     where \eqn{T_0} is the baseline statistic under equal weights.
 #' }
+#'
+#' Intuitively, if the weights are informative, the observed statistic will lie
+#' in the tails of the permutation distribution, leading to a small p‑value.
+#' If the weights are non‑informative, shuffling them destroys any spurious
+#' association with the outcome, and the observed statistic is typical of the
+#' permutation distribution.
+#'
+#' @examples
+#' # Load in survey package (required) and load in example data
+#' library(survey)
+#' data(api, package = "survey")
+#'
+#' # Create a survey design and fit a weighted regression model
+#' des <- svydesign(id = ~1, strata = ~stype, weights = ~pw, data = apistrat)
+#' fit <- svyglm(api00 ~ ell + meals, design = des)
+#'
+#' # Run permutation diagnostic test; reports permutation statistics with p-value
+#' results <- perm_test(fit, stat = "pred_mean", B = 1000, engine = "R")
+#' print(results)
 #'
 #' @useDynLib svytest, .registration = TRUE
 #' @importFrom Rcpp evalCpp
+#' @importFrom survey svyglm
 #'
 #' @export
 perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
@@ -92,7 +140,7 @@ perm_test <- function(model, stat = c("pred_mean", "coef_mahal"), B = 1000,
   if (!is.function(na.action)) {
     stop("`na.action` must be a function (e.g., stats::na.omit).")
   }
-  fam_name <- tryCatch(family(model)$family, error = function(e) NA_character_)
+  fam_name <- tryCatch(stats::family(model)$family, error = function(e) NA_character_)
   if (!is.na(fam_name) && !grepl("gaussian", fam_name, ignore.case = TRUE)) {
     warning("Non-Gaussian family detected; permutation WLS is calibrated for Gaussian models.")
   }

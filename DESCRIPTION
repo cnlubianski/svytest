@@ -21,18 +21,20 @@ LazyData: true
 Depends: 
     R (>= 4.1.0)
 Imports:
-  Rcpp
+  Rcpp,
+  survey
 LinkingTo: 
   Rcpp,
   RcppArmadillo
 Suggests: 
     knitr,
+    MASS,
     rmarkdown,
-    quarto,
+    sampling,
     dplyr,
+    tidyr,
     tibble,
     future.apply,
-    survey,
     broom,
     testthat (>= 3.0.0)
 VignetteBuilder: knitr

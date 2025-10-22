@@ -14,6 +14,8 @@ run_all_diagnostic_tests(model, alpha = 0.05, B = 1000)
 
 \item{alpha}{Critical value for rejection (default 0.05).}
 
+\item{B}{Number of permutations for permutation tests (default 1000).}
+
 \item{x}{An object of class run_all_diagnostic_tests}
 
 \item{...}{Additional arguments passed to methods}
@@ -32,19 +34,17 @@ This function runs all implemented diagnostic tests:
   - \code{\link{perm_test}}() with stats "pred_mean" and "coef_mahal"
 }
 \examples{
-if (requireNamespace("survey", quietly = TRUE)) {
-  # Load in survey package (required) and load in example data
-  library(survey)
-  data("svytestCE", package = "svytest")
+# Load in survey package (required) and load in example data
+library(survey)
+data(api, package = "survey")
 
-  # Create a survey design and fit a weighted regression model
-  des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
-  fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+# Create a survey design and fit a weighted regression model
+des <- svydesign(id = ~1, strata = ~stype, weights = ~pw, data = apistrat)
+fit <- svyglm(api00 ~ ell + meals, design = des)
 
-  # Run all diagnostic tests and return a list of statistics, including a recommendation
-  results <- run_all_diagnostic_tests(fit)
-  print(results)
-}
+# Run all diagnostic tests and return a list of statistics, including a recommendation
+results <- run_all_diagnostic_tests(fit)
+print(results)
 
 }
 \seealso{

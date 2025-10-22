@@ -71,19 +71,17 @@ The test statistic is based on \eqn{R_i = (1 - q_i) u_i}, where
 \eqn{F = \frac{n-p}{p} \bar R^\top S^{-1} \bar R}, with df1 = p, df2 = n - p.
 }
 \examples{
-if (requireNamespace("survey", quietly = TRUE)) {
-  # Load in survey package (required) and load in example data
-  library(survey)
-  data("svytestCE", package = "svytest")
+# Load in survey package (required) and load in example data
+library(survey)
+data("svytestCE", package = "svytest")
 
-  # Create a survey design and fit a weighted regression model
-  des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
-  fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+# Create a survey design and fit a weighted regression model
+des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
 
-  # Run estimating equations diagnostic test; reports F statistic, df's, and p-value
-  results <- estim_eq_test(fit, q_method = "linear")
-  print(results)
-}
+# Run estimating equations diagnostic test; reports F statistic, df's, and p-value
+results <- estim_eq_test(fit, q_method = "linear")
+print(results)
 
 }
 \references{

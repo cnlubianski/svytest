@@ -1,6 +1,3 @@
-# Load in functions
-devtools::load_all()
-
 test_that("diff_in_coef_test works as expected", {
   # Load in survey package (required) and load in example data
   library(survey)

@@ -24,44 +24,70 @@
 #'   \item{call}{Function call}
 #'
 #' @details
-#' The following weight-association test variants are available:
+#' Let \eqn{y} denote the response, \eqn{X} the design matrix of covariates,
+#' and \eqn{w} the survey weights. The null hypothesis in all cases is that
+#' the weights are \emph{non-informative} given \eqn{X}, i.e. they do not
+#' provide additional information about \eqn{y} beyond the covariates.
+#'
+#' The following test variants are implemented:
 #'
 #' \itemize{
-#'   \item \strong{DuMouchel-Duncan (DD)}: Tests informativeness by regressing
-#'         residuals on the survey weights. One of the earliest approaches to
-#'         diagnosing weight effects in regression.
-#'         (DuMouchel & Duncan, 1983).
 #'
-#'   \item \strong{Pfeffermann-Sverchkov PS1}: Augments the regression with
-#'         functions of the weights as auxiliary regressors to test for
-#'         informativeness. Quadratic terms can be included (\code{"PS1q"}).
-#'         (Pfeffermann & Sverchkov, 1999).
+#'   \item \strong{DuMouchel–Duncan (DD)}:
+#'     After fitting the unweighted regression
+#'     \deqn{\hat\beta = (X^\top X)^{-1} X^\top y,}
+#'     compute residuals \eqn{e = y - X\hat\beta}.
+#'     The DD test regresses \eqn{e} on the weights \eqn{w}:
+#'     \deqn{e = \gamma_0 + \gamma_1 w + u.}
+#'     A significant \eqn{\gamma_1} indicates association between weights
+#'     and residuals, hence informativeness.
 #'
-#'   \item \strong{Pfeffermann-Sverchkov PS2}: Uses a two-step approach with
-#'         fitted values from an auxiliary regression of weights on covariates
-#'         to construct test regressors. Quadratic terms can be included
-#'         (\code{"PS2q"}). (Pfeffermann & Sverchkov, 2003).
+#'   \item \strong{Pfeffermann–Sverchkov PS1}:
+#'     Augments the outcome regression with functions of the weights as
+#'     auxiliary regressors:
+#'     \deqn{y = X\beta + f(w)\theta + \varepsilon.}
+#'     Under the null, \eqn{\theta = 0}. Quadratic terms
+#'     (\eqn{w^2}) can be included (\code{"PS1q"}), or the user may supply
+#'     a custom auxiliary design matrix \eqn{f(w)}.
 #'
-#'   \item \strong{Wu-Fuller (WF)}: A preliminary test procedure that evaluates
-#'         whether weighted and unweighted regression estimates differ
-#'         significantly, providing a practical diagnostic for weight necessity.
-#'         (Wu & Fuller, 2005).
+#'   \item \strong{Pfeffermann–Sverchkov PS2}:
+#'     First regress the weights on the covariates,
+#'     \deqn{w = X\alpha + \eta,}
+#'     and obtain fitted values \eqn{\hat w}.
+#'     Then augment the outcome regression with \eqn{\hat w} (and optionally
+#'     \eqn{\hat w^2} for \code{"PS2q"}):
+#'     \deqn{y = X\beta + g(\hat w)\theta + \varepsilon.}
+#'     Again, \eqn{\theta = 0} under the null.
+#'
+#'   \item \strong{Wu–Fuller (WF)}:
+#'     Compares weighted and unweighted regression fits. Let
+#'     \eqn{\hat\beta_W} and \eqn{\hat\beta_U} denote the weighted and
+#'     unweighted estimators. The test statistic is based on
+#'     \deqn{T = (\hat\beta_W - \hat\beta_U)^\top
+#'                \widehat{\mathrm{Var}}^{-1}(\hat\beta_W - \hat\beta_U)
+#'     }
+#'     and follows an approximate \eqn{F} distribution. A large value
+#'     indicates that weights materially affect the regression.
+#'
 #' }
+#'
+#' In all cases, the reported statistic is an \eqn{F}-test with numerator
+#' degrees of freedom equal to the number of auxiliary regressors added,
+#' and denominator degrees of freedom equal to the residual degrees of
+#' freedom from the augmented regression.
 #'
 #' @examples
-#' if (requireNamespace("survey", quietly = TRUE)) {
-#'   # Load in survey package (required) and load in example data
-#'   library(survey)
-#'   data("svytestCE", package = "svytest")
+#' # Load in survey package (required) and load in example data
+#' library(survey)
+#' data(api, package = "survey")
 #'
-#'   # Create a survey design and fit a weighted regression model
-#'   des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
-#'   fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+#' # Create a survey design and fit a weighted regression model
+#' des <- svydesign(id = ~1, strata = ~stype, weights = ~pw, data = apistrat)
+#' fit <- svyglm(api00 ~ ell + meals, design = des)
 #'
-#'   # Run weight-association diagnostic test; reports F-stat, df's, and p-value
-#'   results <- wa_test(fit, type = "DD")
-#'   print(results)
-#' }
+#' # Run weight-association diagnostic test; reports F-stat, df's, and p-value
+#' results <- wa_test(fit, type = "DD")
+#' print(results)
 #'
 #' @references
 #' DuMouchel, W. H., & Duncan, G. J. (1983).
@@ -85,6 +111,8 @@
 #' @seealso
 #' \code{\link{diff_in_coef_test}} for the Hausman-Pfeffermann difference-in-coefficients test,
 #' and \code{\link{svytestCE}} for the example dataset included in this package.
+#'
+#' @importFrom survey svyglm
 #'
 #' @export
 wa_test <- function(model, type = c("DD", "PS1", "PS1q", "PS2", "PS2q", "WF"),

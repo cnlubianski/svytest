@@ -1,8 +1,9 @@
 ---
-title: "svytest"
-output: rmarkdown::html_vignette
+title: "svytest: Diagnostic Tests for Survey Weight Informativeness"
+output: 
+  rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{svytest}
+  %\VignetteIndexEntry{svytest: Diagnostic Tests for Survey Weight Informativeness}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -14,6 +15,290 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r setup}
+```{r setup, echo = FALSE, message = FALSE}
 library(svytest)
+library(survey)
 ```
+
+
+# Introduction
+
+Survey weights are indispensable for producing unbiased population estimates under complex sampling designs. Yet, when fitting regression models, analysts often ask: *are the weights truly informative for my outcome, or can I safely ignore them?* Failure to include informative weights can lead to biased estimates and invalid inference, while including non-informative weights may unnecessarily inflate variance. Analysts need robust tools to assess the informativeness of survey weights in regression contexts.
+
+The **svytest** package provides a suite of diagnostic tests designed to answer this question. These tests adapt classical specification tests (Hausman, 1978; Pfeffermann, 1993), more recent developments (Pfeffermann & Sverchkov, 1999, 2003; Wu & Fuller, 2005) to the survey regression setting, and non-parametric methods to evaluate whether survey weights materially affect regression estimates. Survey weight diagnostic tests are only meant to be used as a diagnostic tool to determine whether weights should be used in a regression analysis approach. Survey weight diagnostic tests should not be used to draw causal relationships between $\vec{Y}$ and $\textbf{X}$ such that they should only be limited to testing the necessity of survey weights in regressions.
+
+This vignette introduces each test, explains the underlying statistical machinery, and demonstrates their use on example data. We conclude by outlining a simulation study design that evaluates their performance. For demonstration purposes, we use the included `svytestCE` dataset, a curated subset of the Consumer Expenditure Survey. See `?svytestCE` for details. Furthermore, the **svytest** package currently supports linear regression models fitted via `svyglm` from the **survey** package. Future versions may extend support to generalized linear models and other modeling frameworks.
+
+
+# General Review of Survey Weight Diagnostic Tests
+
+Bollen et al. (2016) provide a comprehensive review of the landscape of diagnostic tests for
+survey weight informativeness. Their central insight is that, despite the proliferation of methods,
+nearly all tests fall into two broad categories: Difference-in-Coefficients (DC) tests and Weight-Association (WA) tests. 
+
+Bollen and colleagues emphasize that **DC and WA tests are theoretically equivalent**: testing whether weighted and unweighted coefficients differ is equivalent to testing whether weights are correlated with the outcome conditional on covariates. In practice, however, the finite-sample behavior of the tests can diverge, and simulation evidence is limited. Some studies suggest that classical Hausman-type DC tests may over-reject in small samples, while certain WA formulations may be more stable.
+
+They also highlight several practical considerations:
+
+- **Subset testing**: Analysts may care about a particular coefficient (e.g., a treatment effect) rather than all coefficients. Both DC and WA frameworks can be adapted to test subsets.  
+- **Finite-sample properties**: Most tests are justified asymptotically, but their small-sample performance is not well understood.  
+- **Equivalence in principle, divergence in practice**: Although DC and WA tests target the same null, they may yield different conclusions in finite samples.
+
+This classification provides a unifying framework for the diagnostics implemented in **svytest**: the package offers both DC-style tests (e.g., `diff_in_coef_test`) and WA-style tests (e.g., `wa_test` with DD, PS1, PS2, WF variants), along with extensions such as the estimating equations test and permutation-based approaches.
+
+
+# Diagnostic Test Implementation {.tabset}
+
+Throughout this section, we describe each diagnostic test implemented in the **svytest** package. For each test, we outline the statistical formulation, assumptions, and provide example code demonstrating its use. Let $\{(y_k, \vec{X}_k, w_k): k \in S\}$ denote the observed data for sampled units, where $y_k$ is the outcome, $\vec{X}_k$ is a vector of covariates, and $w_k$ is the survey weight for the $k$ response in the survey sample $S$. We will create a `svyglm` object from the `survey` package to demonstrate the tests.
+
+```{r}
+# Construct survey design
+des <- svydesign(ids = ~1, weights = ~FINLWT21, data = svytestCE)
+
+# Fit weighted regression
+fit <- svyglm(TOTEXPCQ ~ ROOMSQ + BATHRMQ + BEDROOMQ + FAM_SIZE + AGE, design = des)
+```
+
+Given the many different options, the function `run_all_diagnostic_tests` provides a convenient wrapper to run all tests and summarize results. It produces a recommendation which can guide analysts on whether to use weights in their regression analysis, though there is no formal consensus on decision rules within the literature of diagnostic tests for survey weights.
+
+```{r}
+# Run all diagnostic tests
+all_results <- run_all_diagnostic_tests(fit, alpha = 0.05)
+print(all_results)
+```
+
+
+
+## Difference-in-Coefficients Tests
+
+The Difference-in-Coefficients (DC) tests assess whether the coefficients estimated from weighted and unweighted regression models differ significantly. The underlying logic is that if weights are informative, they will affect the estimated coefficients. The DC test implemented in **svytest** is based on the Hausman-Pfeffermann framework (Pfeffermann, 1993; Pfeffermann & Sverchkov, 1999). The test statistic is constructed as follows:
+
+Let $W = \text{diag}(w_1, \dots, w_n)$ be the diagonal weight matrix. We define the unweighted and weighted estimator as $$\hat\beta_{U} = (X^\top X)^{-1} X^\top y,$$ $$\hat\beta_{W} = (X^\top W X)^{-1} X^\top W y.$$ 
+The DC test statistic is then given by $$T = (\hat\beta_{W} - \hat\beta_{U})^\top [\text{Var}(\hat\beta_{W}) - \text{Var}(\hat\beta_{U})]^{-1} (\hat\beta_{W} - \hat\beta_{U}),$$ which asymptotically follows a chi-squared distribution with degrees of freedom equal to the number of coefficients tested under the null hypothesis that weights are non-informative. Therefore, with the null hypothesis $H_0: E(\hat\beta_{W} - \hat\beta_{U}) = 0$, we test $T \sim \chi^2_p$.
+
+Determining the variance estimator is crucial for the DC test. Generally, the user assumes homoscedastic residuals and estimates the variance estimator using pooled residual variance from the weighted model. However, we implement options to implement heteroskedasticity-consistent estimators. The **svytest** package implements this test in the `diff_in_coef_test` function. The heteroskedasticity-robust variance estimators available are "HC0", "HC1", "HC2", and "HC3" (MacKinnon & White, 1985) and as implemented in the `sandwich` package.
+
+```{r}
+# Run DC test with equal residual variance
+res_equal <- diff_in_coef_test(fit, var_equal = TRUE)
+print(res_equal)
+
+# Run DC test with heteroskedasticity-robust variance (HC3)
+res_robust <- diff_in_coef_test(fit, var_equal = FALSE, robust_type = "HC3")
+summary(res_robust)
+```
+
+
+## Weight-Association Tests {.tabset}
+
+Weight‑association (WA) tests provide an alternative to difference‑in‑coefficients tests. Rather than directly comparing weighted and unweighted coefficient vectors, WA tests ask: **are the survey weights associated with the outcome (or residuals) after conditioning on covariates?**
+
+Formally, the null hypothesis is $H_0: E(y \mid X, w) = E(y \mid X)$, i.e. weights are non‑informative given the covariates.
+
+
+### DuMouchel–Duncan (DD)
+
+The **DD test** (DuMouchel & Duncan, 1983) is one of the earliest WA diagnostics.
+
+1. Fit the unweighted regression: $$\hat\beta_U = (X^\top X)^{-1} X^\top y.$$
+
+2. Compute residuals: $$e = y - X\hat\beta_U.$$
+
+3. Regress residuals on the weights: $$e = \gamma_0 + \gamma_1 w + u.$$
+
+If \(\gamma_1 = 0\), weights are not associated with residuals. A significant slope indicates that weights explain variation in residuals, hence are informative. The test statistic is an \(F\)-test on \(\gamma_1\).
+
+```{r}
+results <- wa_test(fit, type = "DD")
+print(results)
+```
+
+
+### Pfeffermann–Sverchkov PS1
+
+The **PS1 test** (Pfeffermann & Sverchkov, 1999) augments the regression with functions of the weights: $$y = X\beta + f(w)\theta + \varepsilon.$$
+
+- Under \(H_0\), \(\theta = 0\).  
+- \(f(w)\) can be linear (\(w\)), quadratic (\(w, w^2\)), or user‑supplied.  
+- The quadratic version is denoted **PS1q**.
+
+This is implemented as a nested model comparison:  
+- Reduced model: \(y = X\beta + \varepsilon\).  
+- Full model: \(y = X\beta + f(w)\theta + \varepsilon\).  
+- An \(F\)-test evaluates whether the auxiliary regressors \(f(w)\) improve fit.
+
+```{r}
+results <- wa_test(fit, type = "PS1")
+print(results)
+```
+
+
+### Pfeffermann–Sverchkov PS2
+
+The **PS2 test** (Pfeffermann & Sverchkov, 2003) is a two‑step procedure:
+
+1. Regress weights on covariates: $$w = X\alpha + \eta, \quad \hat w = X\hat\alpha.$$
+
+2. Augment the outcome regression with \(\hat w\): $$y = X\beta + g(\hat w)\theta + \varepsilon.$$
+
+- As with PS1, quadratic terms (\(\hat w, \hat w^2\)) can be included (**PS2q**).  
+- Under \(H_0\), \(\theta = 0\).  
+- The test statistic is again an \(F\)-test comparing reduced and full models.
+
+This approach conditions out the part of the weights predictable from $X$, focusing on whether the residual informativeness of weights matters for $y$.
+
+```{r}
+results <- wa_test(fit, type = "PS2")
+print(results)
+```
+
+
+### Wu–Fuller (WF)
+
+The **WF test** (Wu & Fuller, 2005) is a more elaborate WA test that can be seen as a bridge between DC and WA frameworks.
+
+- Let \(\hat\beta_W\) and \(\hat\beta_U\) be the weighted and unweighted estimators.  
+- Define the difference: $$d = \hat\beta_W - \hat\beta_U.$$
+- Construct the quadratic form: $$T = d^\top \widehat{\mathrm{Var}}^{-1}(d).$$
+
+Unlike the Hausman–Pfeffermann DC test, the WF test is framed as an \(F\)-test in the WA family, but the intuition is similar: if weights are non‑informative, the two estimators should not differ systematically.
+
+```{r}
+results <- wa_test(fit, type = "WF")
+print(results)
+```
+
+
+## Estimating Equations Test
+
+The **Estimating Equations (EE) test** of Pfeffermann & Sverchkov (2003) provides a third
+diagnostic framework for assessing weight informativeness. Unlike the Difference‑in‑Coefficients
+and Weight‑Association tests, which compare regression fits directly, the EE test works at the
+level of the *score equations* that define regression estimators.
+
+For linear regression with Gaussian errors and identity link, the unweighted OLS estimator
+$\hat\beta_{\text{unw}}$ solves the estimating equations $$\sum_{i=1}^n u_i = 0, 
+\qquad u_i = x_i \bigl(y_i - x_i^\top \hat\beta_{\text{unw}}\bigr).$$
+
+To adjust for potential informativeness of weights, define $$q_i = \frac{w_i}{E_s(w_i \mid x_i)}, 
+\qquad R_i = (1 - q_i) u_i,$$
+
+where $E_s(w_i \mid x_i)$ is estimated by regressing $w$ (or $\log w$) on $X$. Let
+$$\bar R = \frac{1}{n} \sum_{i=1}^n R_i, \qquad S = \frac{1}{n-1} \sum_{i=1}^n (R_i - \bar R)(R_i - \bar R)^\top.$$
+
+The Hotelling-type test statistic is $$F = \frac{n-p}{p} \, \bar R^\top S^{-1} \bar R,$$
+
+with numerator degrees of freedom $p$ (the number of tested coefficients) and denominator
+degrees of freedom $n-p$.
+
+```{r}
+linear_results <- estim_eq_test(fit, q_method = "linear")
+print(linear_results)
+
+log_results <- estim_eq_test(fit, q_method = "log")
+print(log_results)
+```
+
+
+## Permutation Tests
+
+The **permutation tests** implemented in **svytest** provide a non-parametric approach to assessing the informativeness of survey weights. These tests do not rely on asymptotic distributions and instead use the empirical distribution of a test statistic under random permutations of the data. The null hypothesis is that, conditional on covariates $X$, the survey weights $w$ are non‑informative with respect to the outcome $y$. Under $H_0$, permuting the weights should not change the distribution of any statistic that measures the effect of weighting.
+
+\begin{enumerate}
+  \item Fit the unweighted and weighted regressions:
+    $$\hat\beta_{U} = (X^\top X)^{-1} X^\top y, 
+    \qquad
+    \hat\beta_{W} = (X^\top W X)^{-1} X^\top W y,$$
+
+  where $W = \mathrm{diag}(w_1,\ldots,w_n)$.
+
+  \item Compute the observed statistic $T_{\text{obs}}$:
+  \begin{itemize}
+    \item \texttt{"pred\_mean"}: difference in mean predicted outcomes, $$T_{\text{obs}} = \bar{\hat y}_W - \bar{\hat y}_U.$$
+    \item \texttt{"coef\_mahal"}: Mahalanobis distance between coefficient vectors,
+      $$T_{\text{obs}} = (\hat\beta_{W} - \hat\beta_{U})^\top (X^\top X)(\hat\beta_{W} - \hat\beta_{U}).$$
+    \item \texttt{custom\_fun}: any user‑supplied scalar function of $(X,y,w)$.
+  \end{itemize}
+
+  \item Generate the null distribution by permuting weights: $$w^{*(b)} = P_b w, \quad b=1,\ldots,B,$$ where $P_b$ is a permutation matrix (restricted within blocks if specified).
+
+  \item Recompute $T^{*(b)}$ for each permuted weight vector.  
+  The empirical distribution $\{T^{*(1)},\ldots,T^{*(B)}\}$ approximates the null.
+
+  \item Compute the two‑sided permutation $p$‑value: $$p = \frac{1 + \sum_{b=1}^B I\!\left(\,\big|T^{*(b)} - T_0\big| \;\ge\; \big|T_{\text{obs}} - T_0\big|\,\right)}{B+1},$$ where $T_0$ is the baseline statistic under equal weights.
+\end{enumerate}
+
+```{r}
+perm_mean_results <- perm_test(fit, stat = "pred_mean", B = 1000, engine = "R")
+print(perm_mean_results)
+
+library(Rcpp)
+perm_mahal_results <- perm_test(fit, stat = "coef_mahal", B = 1000, engine = "C++")
+print(perm_mahal_results)
+```
+
+
+# Simulation Study: Replication of Wang et al. (2023)
+
+To evaluate the finite-sample performance of the diagnostic tests implemented in the \texttt{svytest} package, we replicated the first simulation study of Wang et al. (2023) and extended it to include our non-parametric permutation tests.
+
+## Design
+
+Following Wang et al. (2023), we generated a finite population of size $N=3000$ from the linear model $Y_i = 1 + X_i + \varepsilon_i, \quad i=1,\ldots,N,$ where $X_i \sim \text{Uniform}(0,1)$ and $\varepsilon_i \sim N(0,\sigma^2)$ with $\sigma \in \{0.1, 0.2\}$. Samples of size $n \in \{100,200\}$ were drawn with probability proportional to weights $W_i = \alpha Y_i + 0.3 X_i + \delta U_i,$ where $U_i \sim N(0,1)$, $\delta \in \{1,1.5\}$, and $\alpha \in \{0,0.2,0.4,0.6\}$ controls the informativeness of the weights. When $\alpha=0$, weights are non-informative.
+
+For each configuration $(n,\sigma,\delta,\alpha)$, we generated $1000$ samples and applied the
+following tests:
+
+\begin{itemize}
+  \item DuMouchel--Duncan WA test (DD)
+  \item Pfeffermann--Sverchkov WA tests (PS1, PS1q, PS2, PS2q)
+  \item Hausman--Pfeffermann DC test (HP)
+  \item Pfeffermann--Sverchkov Estimating Equations test (PS3)
+  \item \textbf{Permutation tests} (Predicted mean difference, Coefficient Mahalanobis distance)
+\end{itemize}
+
+A test was deemed to reject if its $p$-value was below $\alpha=0.05$. The empirical rejection rate across replications estimates the size (when $\alpha=0$) and power (when $\alpha>0$).
+
+
+## Results
+
+Consistent with Wang et al. (2023), the PS2 test exhibited the highest power across most configurations, followed by DD, HP, and WF. The PS3 (estimating equations) test was generally less powerful. Our added permutation tests showed competitive performance: the coefficient Mahalanobis statistic was particularly sensitive when informativeness manifested through slope differences, while the predicted mean statistic was more sensitive to shifts in overall prediction levels. Both maintained nominal size when $\alpha = 0$.
+
+These results highlight that permutation-based diagnostics can serve as robust, distribution-free alternatives to parametric tests, complementing the existing DC and WA families.
+
+```{r, echo=FALSE, results='asis', message = FALSE}
+library(knitr)
+library(dplyr)
+
+reject_table <- readRDS(system.file("extdata/st1_reject_table.rds", package = "svytest"))
+reject_table_perm <- readRDS(system.file("extdata/perm_reject_table.rds", package = "svytest")) 
+
+reject_table |> 
+  left_join(reject_table_perm, by = c("n", "sigma", "delta", "alpha")) |>
+  select(n, sigma, delta, alpha,
+         DD, PS1, PS1q, PS2, PS2q, HP, PS3, pred_mean, coef_mahal) |> 
+  kable(digits = 3,
+        caption = "Empirical rejection rates (Study 1 design). Columns correspond to diagnostic tests; rows to simulation scenarios.")
+```
+
+
+# References
+
+- Bollen, K. A., Biemer, P. P., Karr, A. F., Tueller, S., & Berzofsky, M. E. (2016). *Are Survey Weights Needed? A Review of Diagnostic Tests in Regression Analysis*. Annual Review of Statistics and Its Application, 3, 375–392.
+
+- DuMouchel, W. H., & Duncan, G. J. (1983). *Using Sample Survey Weights in Multiple Regression Analyses of Stratified Samples*. Journal of the American Statistical Association, 78(383), 535–543.
+
+- Hausman, J. A. (1978). *Specification Tests in Econometrics*. Econometrica, 46(6), 1251–1271.
+
+- Pfeffermann, D. (1993). *The Role of Sampling Weights When Modeling Survey Data*. International Statistical Review, 61(2), 317–337.
+
+- Pfeffermann, D., & Nathan, G. (1985). *Regression Analysis of Data from Complex Surveys*. Journal of the American Statistical Association, 80(389), 151–160.
+
+- Pfeffermann, D., & Sverchkov, M. (1999). *Parametric and Semi‑parametric Estimation of Regression Models Fitted to Survey Data*. Sankhyā: The Indian Journal of Statistics, Series B, 61(1), 166–186.
+
+- Pfeffermann, D., & Sverchkov, M. (2003). *Fitting Generalized Linear Models under Informative Sampling*. In R. L. Chambers & C. J. Skinner (Eds.), *Analysis of Survey Data* (pp. 175–196). Wiley.
+
+- Wang, F., Wang, H., & Yan, J. (2023). *Diagnostic Tests for the Necessity of Weight in Regression With Survey Data*. International Statistical Review, 91(1), 55–71.
+
+- Wu, Y., & Fuller, W. A. (2005). *Preliminary Testing Procedures for Regression with Survey Samples*. In *Proceedings of the Joint Statistical Meetings, Survey Research Methods Section* (pp. 3683–3688). American Statistical Association.
+
