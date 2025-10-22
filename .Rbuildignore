@@ -8,3 +8,7 @@
 ^\.github$
 ^doc$
 ^Meta$
+^README\.Rmd$
+^README\.md$
+^cran-comments\.md$
+^revdep$

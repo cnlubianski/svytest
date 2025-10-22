@@ -100,7 +100,7 @@ Wu, Y., & Fuller, W. A. (2005).
 \code{\link{diff_in_coef_test}}, \code{\link{wa_test}}, \code{\link{perm_test}}, \code{\link{svytestCE}}
 }
 \author{
-\strong{Maintainer}: Corbin Lubianski \email{cnlubianski@yahoo.com} (\href{https://orcid.org/0009-0009-0547-3249}{ORCID})
+\strong{Maintainer}: Corbin Lubianski \email{cnlubianski@yahoo.com} (\href{https://orcid.org/0009-0009-0547-3249}{ORCID}) [copyright holder]
 
 }
 \keyword{internal}
