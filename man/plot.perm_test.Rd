@@ -17,6 +17,9 @@
 
 \item{...}{Additional arguments passed to \code{hist()}.}
 }
+\value{
+A base R side effect plot. Function returns \code{NULL} invisibly.
+}
 \description{
 Produces a histogram of the permutation distribution with a vertical line
 indicating the observed statistic.

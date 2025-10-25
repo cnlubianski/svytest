@@ -45,7 +45,7 @@ and to evaluate the robustness of analytic inferences under complex sampling.
 \references{
 Asparouhov, T. & B. Muthen (2007). Testing for informative weights and weight trimming
   in multivariate modeling with survey data. *Mplus Web Notes*, 2, 3394-3399.
-  \url{https://api.semanticscholar.org/CorpusID:4506846}
+  \url{https://www.statmodel.com/download/JSM2007000745.pdf}
 
 Bollen, K. A., Biemer, P. P., Karr, A. F., Tueller, S., & Berzofsky, M. E. (2016).
   Are Survey Weights Needed? A Review of Diagnostic Tests in Regression Analysis.

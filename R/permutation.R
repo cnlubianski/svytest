@@ -350,6 +350,8 @@ glance.perm_test <- function(x, ...) {
 #' @param line_col Color for observed statistic line (default "red").
 #' @param ... Additional arguments passed to \code{hist()}.
 #'
+#' @return A base R side effect plot. Function returns \code{NULL} invisibly.
+#'
 #' @export
 plot.perm_test <- function(x, bins = 30, col = "lightgray", line_col = "red", ...) {
   if (is.null(x$perm_stats) || is.null(x$statistic)) {

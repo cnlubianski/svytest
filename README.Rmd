@@ -32,7 +32,7 @@ svytest helps you decide whether weights matter in your regression by offering:
 
 # Installation
 
-You can install the released version of svytest from CRAN with: `install.packages("svytest")` or install the development version from GitHub with: `remotes::ionstall_github("cnlubianski/svytest")`.
+You can install the released version of svytest from CRAN with: `install.packages("svytest")` or install the development version from GitHub with: `remotes::install_github("cnlubianski/svytest")`.
 
 
 # Usage

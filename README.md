@@ -29,7 +29,7 @@ offering:
 
 You can install the released version of svytest from CRAN with:
 `install.packages("svytest")` or install the development version from
-GitHub with: `remotes::ionstall_github("cnlubianski/svytest")`.
+GitHub with: `remotes::install_github("cnlubianski/svytest")`.
 
 # Usage
 
