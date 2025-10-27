@@ -6,3 +6,4 @@
   Resubmitting with changes to DESCRIPTION to address too many spaces in the description field,
   and added references for methods described in description field.
   Also ensured that exported functions in .Rd files have \value{} (plot.perm_test missed this).
+  Fixed doi issue in description field.

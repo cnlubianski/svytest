@@ -10,7 +10,7 @@ Authors@R: c(
       comment = c(ORCID = "0009-0009-0547-3249")
     )
   )
-Description: Provides diagnostic tests for assessing the informativeness of survey weights in regression models. Implements difference-in-coefficients tests (Hausman 1978 <doi:10.2307/1913827>; Pfeffermann 1993 <doi:10.2307/1403570>), weight-association tests (DuMouchel and Duncan 1983 <doi:10.2307/2288185>; Pfeffermann and Sverchkov 1999 <https://www.jstor.org/stable/25051118>; Pfeffermann and Sverchkov 2003 <ISBN:9780470845672>; Wu and Fuller 2005 <https://www.jstor.org/stable/27590461>), estimating equations tests (Pfeffermann and Sverchkov 2003 <ISBN:9780470845672>), and non-parametric permutation tests. Includes simulation utilities replicating Wang et al. (2023 <doi:10.1111/insr.12509>) and extensions.
+Description: Provides diagnostic tests for assessing the informativeness of survey weights in regression models. Implements difference-in-coefficients tests (Hausman 1978 <doi:10.2307/1913827>; Pfeffermann 1993 <doi:10.2307/1403631>), weight-association tests (DuMouchel and Duncan 1983 <doi:10.2307/2288185>; Pfeffermann and Sverchkov 1999 <https://www.jstor.org/stable/25051118>; Pfeffermann and Sverchkov 2003 <ISBN:9780470845672>; Wu and Fuller 2005 <https://www.jstor.org/stable/27590461>), estimating equations tests (Pfeffermann and Sverchkov 2003 <ISBN:9780470845672>), and non-parametric permutation tests. Includes simulation utilities replicating Wang et al. (2023 <doi:10.1111/insr.12509>) and extensions.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
